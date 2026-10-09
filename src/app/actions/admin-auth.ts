@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
@@ -22,14 +22,21 @@ export async function adminLogin(
   }
 
   const { email, password } = parsed.data;
+  // Bare aktive spillere med is_admin kan logge inn her.
   const [admin] = await db
-    .select({ id: schema.admins.id, passwordHash: schema.admins.passwordHash })
-    .from(schema.admins)
-    .where(eq(schema.admins.email, email))
+    .select({ id: schema.players.id, passwordHash: schema.players.passwordHash })
+    .from(schema.players)
+    .where(
+      and(
+        eq(schema.players.email, email),
+        eq(schema.players.isAdmin, true),
+        eq(schema.players.active, true),
+      ),
+    )
     .limit(1);
 
   // Samme melding uansett hva som var feil, så skjemaet ikke avslører hvem som er admin.
-  const ok = admin
+  const ok = admin?.passwordHash
     ? await verifyPassword(password, admin.passwordHash)
     : (await burnPasswordCheck(password), false);
   if (!admin || !ok) {

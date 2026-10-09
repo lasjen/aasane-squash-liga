@@ -29,7 +29,9 @@ async function AdminNav() {
 
   return (
     <nav className="flex items-center gap-4 text-sm">
-      <span className="text-zinc-300">{admin.name}</span>
+      <span className="text-zinc-300">
+        {admin.firstName} {admin.lastName}
+      </span>
       <form action={adminLogout}>
         <button type="submit" className="font-medium underline">
           Logg ut

@@ -29,6 +29,27 @@
       "when": 1791586386159,
       "tag": "0003_fjern-spillernavn",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791586787422,
+      "tag": "0004_admin-som-spillerflagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791586795906,
+      "tag": "0005_admin-okter",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791587372324,
+      "tag": "0006_spillerranking",
+      "breakpoints": true
     }
   ]
 }

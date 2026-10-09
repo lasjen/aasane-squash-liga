@@ -39,8 +39,12 @@ export const players = pgTable("players", {
   gender: playerGender("gender"),
   /** Spillerens egen vurdering av nivået sitt. */
   level: playerLevel("level"),
+  /** Plass i klubbens ranking, 1 er best. Null for spillere som ikke er rangert ennå. */
+  ranking: integer("ranking"),
   /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
   passwordHash: text("password_hash"),
+  /** Gir tilgang til /admin. Settes med `npm run admin`. */
+  isAdmin: boolean("is_admin").notNull().default(false),
   active: boolean("active").notNull().default(true),
   ...timestamps,
 });
@@ -63,29 +67,20 @@ export const sessions = pgTable(
 );
 
 /**
- * Administratorer. Egne brukere, adskilt fra spillerne, så en spillerinnlogging
- * aldri gir admin-tilgang. Opprettes med `npm run admin:opprett`.
+ * Admin-økter. Adskilt fra `sessions` med egen cookie, så en vanlig
+ * spillerinnlogging aldri gir admin-tilgang, selv for spillere med is_admin.
  */
-export const admins = pgTable("admins", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
-  ...timestamps,
-});
-
-/** Innloggingsøkter for administratorer. Fungerer som `sessions`. */
 export const adminSessions = pgTable(
   "admin_sessions",
   {
     id: text("id").primaryKey(),
-    adminId: integer("admin_id")
+    playerId: integer("player_id")
       .notNull()
-      .references(() => admins.id, { onDelete: "cascade" }),
+      .references(() => players.id, { onDelete: "cascade" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamps.createdAt,
   },
-  (t) => [index("admin_sessions_admin_idx").on(t.adminId)],
+  (t) => [index("admin_sessions_player_idx").on(t.playerId)],
 );
 
 /** En sesong av torsdagsligaen, f.eks. «Høst 2026». */

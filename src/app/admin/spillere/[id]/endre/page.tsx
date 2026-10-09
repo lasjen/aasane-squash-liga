@@ -1,0 +1,55 @@
+import { eq } from "drizzle-orm";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { Suspense } from "react";
+
+import { updatePlayer } from "@/app/actions/admin-players";
+import { db, schema } from "@/db";
+import { requireAdmin } from "@/lib/auth/admin-session";
+
+import { PlayerForm } from "../../player-form";
+
+export const metadata: Metadata = { title: "Endre spiller – Admin – Torsdagsligaen" };
+
+export default function EditPlayerPage({ params }: PageProps<"/admin/spillere/[id]/endre">) {
+  return (
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 py-10">
+      <h1 className="text-2xl font-semibold tracking-tight">Endre spiller</h1>
+      <Suspense fallback={<p className="text-zinc-500">Henter spiller …</p>}>
+        <EditPlayerForm params={params} />
+      </Suspense>
+    </main>
+  );
+}
+
+async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
+
+  const id = Number((await params).id);
+  if (!Number.isSafeInteger(id) || id < 1) notFound();
+
+  const [player] = await db
+    .select()
+    .from(schema.players)
+    .where(eq(schema.players.id, id))
+    .limit(1);
+  if (!player) notFound();
+
+  return (
+    <PlayerForm
+      action={updatePlayer.bind(null, player.id)}
+      defaults={{
+        firstName: player.firstName,
+        lastName: player.lastName,
+        gender: player.gender ?? "",
+        level: player.level ?? "",
+        email: player.email ?? "",
+        phone: player.phone ?? "",
+        active: player.active ? "on" : "",
+        isAdmin: player.isAdmin ? "on" : "",
+      }}
+      submitLabel="Lagre endringer"
+      isNew={false}
+    />
+  );
+}

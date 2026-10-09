@@ -16,17 +16,17 @@ const COOKIE_PATH = "/admin";
 /** Admin-økter varer kortere enn spillerøkter. */
 const ADMIN_SESSION_HOURS = 12;
 
-/** Oppretter en ny admin-økt og setter cookien. Kalles fra server actions. */
-export async function createAdminSession(adminId: number) {
+/** Oppretter en ny admin-økt for spilleren og setter cookien. Kalles fra server actions. */
+export async function createAdminSession(playerId: number) {
   const { token } = newSessionToken();
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000);
 
   await db
     .delete(schema.adminSessions)
     .where(
-      and(eq(schema.adminSessions.adminId, adminId), lt(schema.adminSessions.expiresAt, sql`now()`)),
+      and(eq(schema.adminSessions.playerId, playerId), lt(schema.adminSessions.expiresAt, sql`now()`)),
     );
-  await db.insert(schema.adminSessions).values({ id: hashToken(token), adminId, expiresAt });
+  await db.insert(schema.adminSessions).values({ id: hashToken(token), playerId, expiresAt });
 
   (await cookies()).set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -47,19 +47,29 @@ export async function deleteAdminSession() {
   cookieStore.delete({ name: COOKIE_NAME, path: COOKIE_PATH });
 }
 
-/** Den innloggede administratoren, eller null. Memoisert per forespørsel. */
+/**
+ * Den innloggede administratoren, eller null. Memoisert per forespørsel.
+ * is_admin sjekkes hver gang, så en som mister admin-rollen mister tilgangen med en gang.
+ */
 export const getCurrentAdmin = cache(async () => {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;
 
   const [row] = await db
-    .select({ id: schema.admins.id, name: schema.admins.name, email: schema.admins.email })
+    .select({
+      id: schema.players.id,
+      firstName: schema.players.firstName,
+      lastName: schema.players.lastName,
+      email: schema.players.email,
+    })
     .from(schema.adminSessions)
-    .innerJoin(schema.admins, eq(schema.admins.id, schema.adminSessions.adminId))
+    .innerJoin(schema.players, eq(schema.players.id, schema.adminSessions.playerId))
     .where(
       and(
         eq(schema.adminSessions.id, hashToken(token)),
         gt(schema.adminSessions.expiresAt, sql`now()`),
+        eq(schema.players.isAdmin, true),
+        eq(schema.players.active, true),
       ),
     )
     .limit(1);

@@ -33,8 +33,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | Tabell             | Innhold                                                        |
 | ------------------ | -------------------------------------------------------------- |
 | `players`          | Spillere i klubben, på tvers av sesonger                       |
-| `admins`           | Administratorer, adskilt fra spillerne                         |
-| `admin_sessions`   | Innloggingsøkter for administratorer                           |
+| `admin_sessions`   | Innloggingsøkter for admin, adskilt fra vanlige økter          |
 | `seasons`          | Sesonger av ligaen, f.eks. «Høst 2026»                         |
 | `divisions`        | Divisjoner per sesong, nivå 1 er øverst                        |
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
@@ -66,8 +65,8 @@ stedet.
 
 Testdataene ligger i `src/db/seed/`. Akkurat nå er det 20 fiktive spillere
 med e-postadresser på `example.com`. Alle har passordet `squash123`, så du
-kan logge inn som for eksempel `kari.nordmann@example.com`. Det finnes også
-en test-admin, `admin@example.com`, med samme passord.
+kan logge inn som for eksempel `kari.nordmann@example.com`.
+`ola.nordmann@example.com` er admin og kan også logge inn på `/admin/logg-inn`.
 
 | Kommando           | Hva den gjør                                              |
 | ------------------ | --------------------------------------------------------- |
@@ -106,22 +105,39 @@ brukernavn), passord og nivå. Valgene for kjønn og nivå ligger i
 
 ### Administratorer
 
-Administratorer logger inn på `/admin/logg-inn` og havner på `/admin`.
+Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
+`/admin/logg-inn` med samme e-post og passord som ellers, og havner på `/admin`.
 
-- De er egne brukere i tabellen `admins`. En spillerinnlogging gir aldri
-  admin-tilgang, og en admin er ikke automatisk spiller.
-- Admin-cookien heter `admin_session`, gjelder bare under `/admin` og varer
-  i 12 timer.
-- Man kan ikke registrere seg som admin. Opprett en med:
+- Admin-innloggingen er en egen økt (`admin_sessions`) med egen cookie,
+  `admin_session`, som bare gjelder under `/admin` og varer i 12 timer.
+  Å være logget inn som spiller gir ikke admin-tilgang.
+- `is_admin` sjekkes ved hver forespørsel. Fjernes flagget, mister personen
+  tilgangen med en gang.
+- Gi eller fjern admin-tilgang for en registrert spiller:
 
   ```bash
-  npm run admin:opprett -- ola@klubben.no "Ola Nordmann"
+  npm run admin -- ola@klubben.no
+  npm run admin -- ola@klubben.no --fjern
   ```
 
-  Passordet genereres og skrives ut én gang. Kjør samme kommando igjen for å
-  lage nytt passord. Da logges også alle gamle økter ut.
+- På `/admin` kan admin legge til, endre og slette spillere, og oppdatere
+  rankingen. En spiller som har spilt kamper eller vært i en divisjon blir
+  deaktivert i stedet for slettet, så resultatene beholdes.
 - Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
   admin-side og hver server action for admin. Layouten alene beskytter ikke.
+
+### Ranking
+
+`players.ranking` er spillerens plass i klubben, der 1 er best. Knappen
+«Oppdater ranking» på `/admin` (`buildRanking` i `src/lib/ranking.ts`):
+
+1. Spillere som allerede har ranking beholder rekkefølgen sin, og hull tettes.
+2. Aktive spillere uten ranking legges under, sortert på nivå: proff,
+   erfaren, medium, ny begynner, og til slutt de uten nivå. Innen hvert nivå
+   er rekkefølgen tilfeldig.
+3. Inaktive spillere tas ut av rankingen.
+
+Første gang, når ingen har ranking, blir hele rankingen altså laget ut fra nivå.
 
 Prosjektet bruker Cache Components, så komponenter som leser innloggingen
 må ligge inni `<Suspense>`.

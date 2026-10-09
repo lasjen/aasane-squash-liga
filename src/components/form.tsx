@@ -52,9 +52,18 @@ type RadioGroupProps = {
   errors?: string[];
   /** Stabler alternativene vannrett (korte valg) eller loddrett (valg med forklaring). */
   layout?: "row" | "column";
+  required?: boolean;
 };
 
-export function RadioGroup({ legend, name, options, defaultValue, errors, layout = "row" }: RadioGroupProps) {
+export function RadioGroup({
+  legend,
+  name,
+  options,
+  defaultValue,
+  errors,
+  layout = "row",
+  required = true,
+}: RadioGroupProps) {
   const errorId = `felt-${name}-feil`;
 
   return (
@@ -75,7 +84,7 @@ export function RadioGroup({ legend, name, options, defaultValue, errors, layout
               name={name}
               value={o.value}
               defaultChecked={o.value === defaultValue}
-              required
+              required={required}
               className="mt-1 accent-zinc-900 dark:accent-zinc-100"
             />
             <span className="flex flex-col">
@@ -93,6 +102,33 @@ export function RadioGroup({ legend, name, options, defaultValue, errors, layout
         </ul>
       ) : null}
     </fieldset>
+  );
+}
+
+export function Checkbox({
+  label,
+  name,
+  hint,
+  defaultChecked,
+}: {
+  label: string;
+  name: string;
+  hint?: ReactNode;
+  defaultChecked?: boolean;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5">
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="mt-1 size-4 accent-zinc-900 dark:accent-zinc-100"
+      />
+      <span className="flex flex-col">
+        <span className="text-sm font-medium">{label}</span>
+        {hint && <span className="text-sm text-zinc-500">{hint}</span>}
+      </span>
+    </label>
   );
 }
 

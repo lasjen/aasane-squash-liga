@@ -5,12 +5,9 @@ type NewPlayer = typeof players.$inferInsert;
 /** Felles passord for alle testspillerne. Kun for lokal utvikling. */
 export const TEST_PASSWORD = "squash123";
 
-/** Test-administrator med samme passord. Logg inn på /admin/logg-inn. */
-export const testAdmin = { name: "Test Admin", email: "admin@example.com" };
-
 /** Fiktive testspillere. E-postadressene bruker example.com, som aldri leverer e-post. */
 export const testPlayers: NewPlayer[] = [
-  { firstName: "Ola", lastName: "Nordmann", gender: "male", level: "beginner", email: "ola.nordmann@example.com", phone: "40000001" },
+  { firstName: "Ola", lastName: "Nordmann", gender: "male", level: "beginner", email: "ola.nordmann@example.com", phone: "40000001", isAdmin: true },
   { firstName: "Kari", lastName: "Nordmann", gender: "female", level: "intermediate", email: "kari.nordmann@example.com", phone: "40000002" },
   { firstName: "Lars", lastName: "Hansen", gender: "male", level: "experienced", email: "lars.hansen@example.com", phone: "40000003" },
   { firstName: "Ingrid", lastName: "Johansen", gender: "female", level: "pro", email: "ingrid.johansen@example.com", phone: "40000004" },
