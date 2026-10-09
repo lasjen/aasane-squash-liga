@@ -11,7 +11,8 @@ import { PgTable } from "drizzle-orm/pg-core";
 import { Pool } from "pg";
 
 import * as schema from "../schema";
-import { testPlayers } from "./players";
+import { hashPassword } from "../../lib/auth/password";
+import { testPlayers, TEST_PASSWORD } from "./players";
 
 loadEnvConfig(process.cwd());
 
@@ -49,12 +50,13 @@ async function main(databaseUrl: string) {
         console.log(`Tømte ${allTables.length} tabeller.`);
       }
 
+      const passwordHash = await hashPassword(TEST_PASSWORD);
       const inserted = await tx
         .insert(schema.players)
-        .values(testPlayers)
+        .values(testPlayers.map((p) => ({ ...p, passwordHash })))
         .onConflictDoNothing({ target: schema.players.email })
         .returning({ id: schema.players.id });
-      console.log(`La til ${inserted.length} av ${testPlayers.length} testspillere.`);
+      console.log(`La til ${inserted.length} av ${testPlayers.length} testspillere (passord: ${TEST_PASSWORD}).`);
     });
   } finally {
     await pool.end();

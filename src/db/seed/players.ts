@@ -2,6 +2,9 @@ import type { players } from "../schema";
 
 type NewPlayer = typeof players.$inferInsert;
 
+/** Felles passord for alle testspillerne. Kun for lokal utvikling. */
+export const TEST_PASSWORD = "squash123";
+
 /** Fiktive testspillere. E-postadressene bruker example.com, som aldri leverer e-post. */
 export const testPlayers: NewPlayer[] = [
   { name: "Ola Nordmann", email: "ola.nordmann@example.com", phone: "40000001" },

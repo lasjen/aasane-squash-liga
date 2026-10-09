@@ -29,9 +29,28 @@ export const players = pgTable("players", {
   name: text("name").notNull(),
   email: text("email").unique(),
   phone: text("phone"),
+  /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
+  passwordHash: text("password_hash"),
   active: boolean("active").notNull().default(true),
   ...timestamps,
 });
+
+/**
+ * Innloggingsøkter. Id-en er en SHA-256-hash av tokenet i cookien,
+ * så en lekket database ikke kan brukes til å kapre økter.
+ */
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("sessions_player_idx").on(t.playerId)],
+);
 
 /** En sesong av torsdagsligaen, f.eks. «Høst 2026». */
 export const seasons = pgTable(

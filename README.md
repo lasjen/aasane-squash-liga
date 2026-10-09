@@ -39,6 +39,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `rounds`           | Kampkvelder (torsdager) i en sesong                            |
 | `matches`          | Kamper mellom to spillere, med status og vinner                |
 | `match_games`      | Poeng per game i en kamp (best av fem)                         |
+| `sessions`         | Innloggingsøkter (lagrer bare en hash av tokenet)              |
 
 Tabellpoeng regnes ut fra kampene i stedet for å lagres, så tabellen
 alltid stemmer med resultatene.
@@ -62,7 +63,8 @@ stedet.
 ### Testdata
 
 Testdataene ligger i `src/db/seed/`. Akkurat nå er det 20 fiktive spillere
-med e-postadresser på `example.com`.
+med e-postadresser på `example.com`. Alle har passordet `squash123`, så du
+kan logge inn som for eksempel `kari.nordmann@example.com`.
 
 | Kommando           | Hva den gjør                                              |
 | ------------------ | --------------------------------------------------------- |
@@ -78,6 +80,25 @@ For å starte helt fra bunnen, med tomt skjema og alt:
 docker compose down -v    # sletter databasevolumet
 npm run db:up && npm run db:migrate && npm run db:seed
 ```
+
+## Innlogging
+
+Spillere registrerer seg på `/registrer` og logger inn på `/logg-inn` med
+e-post og passord.
+
+- Passord hashes med scrypt (innebygd i Node) og lagres aldri i klartekst.
+- Innloggingen er en økt i databasen. Cookien inneholder et tilfeldig
+  token, og databasen lagrer bare SHA-256-hashen av det. Utlogging sletter
+  økten.
+- Øktene varer i 30 dager. Cookien er `httpOnly`, `sameSite=lax` og `secure`
+  i produksjon.
+- E-post lagres med små bokstaver, så `Ola@x.no` og `ola@x.no` er samme bruker.
+- Koden ligger i `src/lib/auth/` og `src/app/actions/auth.ts`. Bruk
+  `getCurrentPlayer()` for å hente innlogget spiller, og `requirePlayer()`
+  på sider som krever innlogging.
+
+Prosjektet bruker Cache Components, så komponenter som leser innloggingen
+må ligge inni `<Suspense>`.
 
 ## Nyttige kommandoer
 
