@@ -33,6 +33,8 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | Tabell             | Innhold                                                        |
 | ------------------ | -------------------------------------------------------------- |
 | `players`          | Spillere i klubben, på tvers av sesonger                       |
+| `admins`           | Administratorer, adskilt fra spillerne                         |
+| `admin_sessions`   | Innloggingsøkter for administratorer                           |
 | `seasons`          | Sesonger av ligaen, f.eks. «Høst 2026»                         |
 | `divisions`        | Divisjoner per sesong, nivå 1 er øverst                        |
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
@@ -64,7 +66,8 @@ stedet.
 
 Testdataene ligger i `src/db/seed/`. Akkurat nå er det 20 fiktive spillere
 med e-postadresser på `example.com`. Alle har passordet `squash123`, så du
-kan logge inn som for eksempel `kari.nordmann@example.com`.
+kan logge inn som for eksempel `kari.nordmann@example.com`. Det finnes også
+en test-admin, `admin@example.com`, med samme passord.
 
 | Kommando           | Hva den gjør                                              |
 | ------------------ | --------------------------------------------------------- |
@@ -97,6 +100,29 @@ e-post og passord.
   `getCurrentPlayer()` for å hente innlogget spiller, og `requirePlayer()`
   på sider som krever innlogging.
 
+Registreringen lagrer fornavn, etternavn, kjønn, mobil, e-post (brukes som
+brukernavn), passord og nivå. Valgene for kjønn og nivå ligger i
+`src/lib/player-options.ts`.
+
+### Administratorer
+
+Administratorer logger inn på `/admin/logg-inn` og havner på `/admin`.
+
+- De er egne brukere i tabellen `admins`. En spillerinnlogging gir aldri
+  admin-tilgang, og en admin er ikke automatisk spiller.
+- Admin-cookien heter `admin_session`, gjelder bare under `/admin` og varer
+  i 12 timer.
+- Man kan ikke registrere seg som admin. Opprett en med:
+
+  ```bash
+  npm run admin:opprett -- ola@klubben.no "Ola Nordmann"
+  ```
+
+  Passordet genereres og skrives ut én gang. Kjør samme kommando igjen for å
+  lage nytt passord. Da logges også alle gamle økter ut.
+- Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
+  admin-side og hver server action for admin. Layouten alene beskytter ikke.
+
 Prosjektet bruker Cache Components, så komponenter som leser innloggingen
 må ligge inni `<Suspense>`.
 
@@ -111,7 +137,8 @@ må ligge inni `<Suspense>`.
 
 ## Struktur
 
-- `src/app/` – sider og layout (App Router)
+- `src/app/(site)/` – sidene spillerne bruker
+- `src/app/admin/` – admin-sidene, med egen header
 - `src/db/` – databasetilkobling og datamodell
 - `drizzle/` – databasemigrasjoner
 - `public/` – statiske filer som bilder og ikoner

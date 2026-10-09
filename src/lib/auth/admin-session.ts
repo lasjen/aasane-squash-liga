@@ -1,0 +1,84 @@
+import "server-only";
+
+import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { cache } from "react";
+
+import { db, schema } from "@/db";
+
+import { hashToken, newSessionToken } from "./tokens";
+
+// Egen cookie, begrenset til /admin, så den aldri sendes med vanlige sider
+// og ikke kan forveksles med spillerøkten.
+const COOKIE_NAME = "admin_session";
+const COOKIE_PATH = "/admin";
+/** Admin-økter varer kortere enn spillerøkter. */
+const ADMIN_SESSION_HOURS = 12;
+
+/** Oppretter en ny admin-økt og setter cookien. Kalles fra server actions. */
+export async function createAdminSession(adminId: number) {
+  const { token } = newSessionToken();
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000);
+
+  await db
+    .delete(schema.adminSessions)
+    .where(
+      and(eq(schema.adminSessions.adminId, adminId), lt(schema.adminSessions.expiresAt, sql`now()`)),
+    );
+  await db.insert(schema.adminSessions).values({ id: hashToken(token), adminId, expiresAt });
+
+  (await cookies()).set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: COOKIE_PATH,
+    expires: expiresAt,
+  });
+}
+
+/** Sletter admin-økten i databasen og fjerner cookien. Kalles fra server actions. */
+export async function deleteAdminSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  if (token) {
+    await db.delete(schema.adminSessions).where(eq(schema.adminSessions.id, hashToken(token)));
+  }
+  cookieStore.delete({ name: COOKIE_NAME, path: COOKIE_PATH });
+}
+
+/** Den innloggede administratoren, eller null. Memoisert per forespørsel. */
+export const getCurrentAdmin = cache(async () => {
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  if (!token) return null;
+
+  const [row] = await db
+    .select({ id: schema.admins.id, name: schema.admins.name, email: schema.admins.email })
+    .from(schema.adminSessions)
+    .innerJoin(schema.admins, eq(schema.admins.id, schema.adminSessions.adminId))
+    .where(
+      and(
+        eq(schema.adminSessions.id, hashToken(token)),
+        gt(schema.adminSessions.expiresAt, sql`now()`),
+      ),
+    )
+    .limit(1);
+
+  return row ?? null;
+});
+
+/**
+ * Som getCurrentAdmin, men sender til admin-innlogging hvis ingen er logget inn.
+ * Kall den i hver admin-side og hver admin-action. Layouten alene beskytter ikke.
+ */
+export async function requireAdmin() {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/admin/logg-inn");
+  return admin;
+}
+
+/** Sender innloggede administratorer videre fra /admin/logg-inn. Rendres inni <Suspense>. */
+export async function RedirectIfAdmin({ to = "/admin" }: { to?: string }) {
+  if (await getCurrentAdmin()) redirect(to);
+  return null;
+}

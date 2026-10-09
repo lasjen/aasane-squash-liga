@@ -12,7 +12,7 @@ import { Pool } from "pg";
 
 import * as schema from "../schema";
 import { hashPassword } from "../../lib/auth/password";
-import { testPlayers, TEST_PASSWORD } from "./players";
+import { testAdmin, testPlayers, TEST_PASSWORD } from "./players";
 
 loadEnvConfig(process.cwd());
 
@@ -57,6 +57,13 @@ async function main(databaseUrl: string) {
         .onConflictDoNothing({ target: schema.players.email })
         .returning({ id: schema.players.id });
       console.log(`La til ${inserted.length} av ${testPlayers.length} testspillere (passord: ${TEST_PASSWORD}).`);
+
+      const admins = await tx
+        .insert(schema.admins)
+        .values({ ...testAdmin, passwordHash })
+        .onConflictDoNothing({ target: schema.admins.email })
+        .returning({ id: schema.admins.id });
+      if (admins.length) console.log(`La til admin ${testAdmin.email} (passord: ${TEST_PASSWORD}).`);
     });
   } finally {
     await pool.end();

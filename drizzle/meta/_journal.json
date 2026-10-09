@@ -15,6 +15,20 @@
       "when": 1791585038651,
       "tag": "0001_innlogging",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791586375398,
+      "tag": "0002_spillerprofil-og-admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791586386159,
+      "tag": "0003_fjern-spillernavn",
+      "breakpoints": true
     }
   ]
 }

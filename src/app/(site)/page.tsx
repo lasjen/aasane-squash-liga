@@ -45,7 +45,7 @@ async function Welcome() {
   const player = await getCurrentPlayer();
 
   if (player) {
-    return <p className="font-medium">Hei, {player.name.split(" ")[0]}!</p>;
+    return <p className="font-medium">Hei, {player.firstName}!</p>;
   }
   return (
     <Link

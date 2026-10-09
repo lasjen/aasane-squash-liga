@@ -44,6 +44,58 @@ export function Field({ label, name, errors, hint, ...input }: FieldProps) {
   );
 }
 
+type RadioGroupProps = {
+  legend: string;
+  name: string;
+  options: { value: string; label: string; hint?: string }[];
+  defaultValue?: string;
+  errors?: string[];
+  /** Stabler alternativene vannrett (korte valg) eller loddrett (valg med forklaring). */
+  layout?: "row" | "column";
+};
+
+export function RadioGroup({ legend, name, options, defaultValue, errors, layout = "row" }: RadioGroupProps) {
+  const errorId = `felt-${name}-feil`;
+
+  return (
+    <fieldset
+      className="flex flex-col gap-1.5"
+      aria-invalid={errors?.length ? true : undefined}
+      aria-describedby={errors?.length ? errorId : undefined}
+    >
+      <legend className="mb-1.5 text-sm font-medium">{legend}</legend>
+      <div className={layout === "row" ? "flex flex-wrap gap-2" : "flex flex-col gap-2"}>
+        {options.map((o) => (
+          <label
+            key={o.value}
+            className="flex cursor-pointer items-start gap-2.5 rounded-md border border-zinc-300 px-3 py-2 has-checked:border-zinc-900 has-checked:bg-zinc-50 has-focus-visible:ring-2 has-focus-visible:ring-zinc-900/10 dark:border-zinc-700 dark:has-checked:border-zinc-100 dark:has-checked:bg-zinc-900"
+          >
+            <input
+              type="radio"
+              name={name}
+              value={o.value}
+              defaultChecked={o.value === defaultValue}
+              required
+              className="mt-1 accent-zinc-900 dark:accent-zinc-100"
+            />
+            <span className="flex flex-col">
+              <span>{o.label}</span>
+              {o.hint && <span className="text-sm text-zinc-500">{o.hint}</span>}
+            </span>
+          </label>
+        ))}
+      </div>
+      {errors?.length ? (
+        <ul id={errorId} className="text-sm text-red-700 dark:text-red-400">
+          {errors.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function FormMessage({ children }: { children?: ReactNode }) {
   if (!children) return null;
   return (

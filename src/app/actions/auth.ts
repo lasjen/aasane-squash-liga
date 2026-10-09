@@ -27,7 +27,10 @@ export async function register(
   formData: FormData,
 ): Promise<FormState<RegisterField>> {
   const values = {
-    name: text(formData, "name"),
+    firstName: text(formData, "firstName"),
+    lastName: text(formData, "lastName"),
+    gender: text(formData, "gender"),
+    level: text(formData, "level"),
     email: text(formData, "email"),
     phone: text(formData, "phone"),
   };
@@ -40,12 +43,20 @@ export async function register(
     return { errors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
-  const { name, email, phone, password } = parsed.data;
+  const { firstName, lastName, gender, level, email, phone, password } = parsed.data;
   let playerId: number;
   try {
     const [player] = await db
       .insert(schema.players)
-      .values({ name, email, phone, passwordHash: await hashPassword(password) })
+      .values({
+        firstName,
+        lastName,
+        gender,
+        level,
+        email,
+        phone,
+        passwordHash: await hashPassword(password),
+      })
       .returning({ id: schema.players.id });
     playerId = player.id;
   } catch (err) {

@@ -1,7 +1,5 @@
 import "server-only";
 
-import { createHash, randomBytes } from "node:crypto";
-
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,15 +7,13 @@ import { cache } from "react";
 
 import { db, schema } from "@/db";
 
-const COOKIE_NAME = "session";
-const SESSION_DAYS = 30;
+import { hashToken, newSessionToken } from "./tokens";
 
-const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+const COOKIE_NAME = "session";
 
 /** Oppretter en ny økt for spilleren og setter cookien. Kalles fra server actions. */
 export async function createSession(playerId: number) {
-  const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const { token, expiresAt } = newSessionToken();
 
   // Rydder bort spillerens utløpte økter samtidig.
   await db
@@ -52,7 +48,8 @@ export const getCurrentPlayer = cache(async () => {
   const [row] = await db
     .select({
       id: schema.players.id,
-      name: schema.players.name,
+      firstName: schema.players.firstName,
+      lastName: schema.players.lastName,
       email: schema.players.email,
     })
     .from(schema.sessions)

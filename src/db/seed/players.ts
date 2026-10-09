@@ -5,26 +5,29 @@ type NewPlayer = typeof players.$inferInsert;
 /** Felles passord for alle testspillerne. Kun for lokal utvikling. */
 export const TEST_PASSWORD = "squash123";
 
+/** Test-administrator med samme passord. Logg inn på /admin/logg-inn. */
+export const testAdmin = { name: "Test Admin", email: "admin@example.com" };
+
 /** Fiktive testspillere. E-postadressene bruker example.com, som aldri leverer e-post. */
 export const testPlayers: NewPlayer[] = [
-  { name: "Ola Nordmann", email: "ola.nordmann@example.com", phone: "40000001" },
-  { name: "Kari Nordmann", email: "kari.nordmann@example.com", phone: "40000002" },
-  { name: "Lars Hansen", email: "lars.hansen@example.com", phone: "40000003" },
-  { name: "Ingrid Johansen", email: "ingrid.johansen@example.com", phone: "40000004" },
-  { name: "Erik Olsen", email: "erik.olsen@example.com", phone: "40000005" },
-  { name: "Marte Larsen", email: "marte.larsen@example.com", phone: "40000006" },
-  { name: "Henrik Andersen", email: "henrik.andersen@example.com", phone: "40000007" },
-  { name: "Sofie Pedersen", email: "sofie.pedersen@example.com", phone: "40000008" },
-  { name: "Magnus Nilsen", email: "magnus.nilsen@example.com", phone: "40000009" },
-  { name: "Nora Kristiansen", email: "nora.kristiansen@example.com", phone: "40000010" },
-  { name: "Jonas Jensen", email: "jonas.jensen@example.com", phone: "40000011" },
-  { name: "Emma Karlsen", email: "emma.karlsen@example.com", phone: "40000012" },
-  { name: "Sindre Johnsen", email: "sindre.johnsen@example.com", phone: "40000013" },
-  { name: "Thea Pettersen", email: "thea.pettersen@example.com", phone: "40000014" },
-  { name: "Andreas Eriksen", email: "andreas.eriksen@example.com", phone: "40000015" },
-  { name: "Hanna Berg", email: "hanna.berg@example.com", phone: "40000016" },
-  { name: "Martin Haugen", email: "martin.haugen@example.com", phone: "40000017" },
-  { name: "Ida Hagen", email: "ida.hagen@example.com", phone: "40000018" },
-  { name: "Kristian Bakken", email: "kristian.bakken@example.com", phone: "40000019" },
-  { name: "Silje Lie", email: "silje.lie@example.com", phone: "40000020", active: false },
+  { firstName: "Ola", lastName: "Nordmann", gender: "male", level: "beginner", email: "ola.nordmann@example.com", phone: "40000001" },
+  { firstName: "Kari", lastName: "Nordmann", gender: "female", level: "intermediate", email: "kari.nordmann@example.com", phone: "40000002" },
+  { firstName: "Lars", lastName: "Hansen", gender: "male", level: "experienced", email: "lars.hansen@example.com", phone: "40000003" },
+  { firstName: "Ingrid", lastName: "Johansen", gender: "female", level: "pro", email: "ingrid.johansen@example.com", phone: "40000004" },
+  { firstName: "Erik", lastName: "Olsen", gender: "male", level: "beginner", email: "erik.olsen@example.com", phone: "40000005" },
+  { firstName: "Marte", lastName: "Larsen", gender: "female", level: "intermediate", email: "marte.larsen@example.com", phone: "40000006" },
+  { firstName: "Henrik", lastName: "Andersen", gender: "male", level: "experienced", email: "henrik.andersen@example.com", phone: "40000007" },
+  { firstName: "Sofie", lastName: "Pedersen", gender: "female", level: "pro", email: "sofie.pedersen@example.com", phone: "40000008" },
+  { firstName: "Magnus", lastName: "Nilsen", gender: "male", level: "beginner", email: "magnus.nilsen@example.com", phone: "40000009" },
+  { firstName: "Nora", lastName: "Kristiansen", gender: "female", level: "intermediate", email: "nora.kristiansen@example.com", phone: "40000010" },
+  { firstName: "Jonas", lastName: "Jensen", gender: "male", level: "experienced", email: "jonas.jensen@example.com", phone: "40000011" },
+  { firstName: "Emma", lastName: "Karlsen", gender: "female", level: "pro", email: "emma.karlsen@example.com", phone: "40000012" },
+  { firstName: "Sindre", lastName: "Johnsen", gender: "male", level: "beginner", email: "sindre.johnsen@example.com", phone: "40000013" },
+  { firstName: "Thea", lastName: "Pettersen", gender: "female", level: "intermediate", email: "thea.pettersen@example.com", phone: "40000014" },
+  { firstName: "Andreas", lastName: "Eriksen", gender: "male", level: "experienced", email: "andreas.eriksen@example.com", phone: "40000015" },
+  { firstName: "Hanna", lastName: "Berg", gender: "female", level: "pro", email: "hanna.berg@example.com", phone: "40000016" },
+  { firstName: "Martin", lastName: "Haugen", gender: "male", level: "beginner", email: "martin.haugen@example.com", phone: "40000017" },
+  { firstName: "Ida", lastName: "Hagen", gender: "female", level: "intermediate", email: "ida.hagen@example.com", phone: "40000018" },
+  { firstName: "Kristian", lastName: "Bakken", gender: "male", level: "experienced", email: "kristian.bakken@example.com", phone: "40000019" },
+  { firstName: "Silje", lastName: "Lie", gender: "female", level: "pro", email: "silje.lie@example.com", phone: "40000020", active: false },
 ];

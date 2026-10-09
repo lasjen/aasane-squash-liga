@@ -15,6 +15,8 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { GENDERS, LEVELS } from "../lib/player-options";
+
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -23,12 +25,20 @@ const timestamps = {
     .$onUpdate(() => new Date()),
 };
 
+export const playerGender = pgEnum("player_gender", GENDERS);
+export const playerLevel = pgEnum("player_level", LEVELS);
+
 /** Spillere i klubben. Beholdes på tvers av sesonger. */
 export const players = pgTable("players", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  name: text("name").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
   email: text("email").unique(),
   phone: text("phone"),
+  /** Null for spillere som er lagt inn før feltet fantes. */
+  gender: playerGender("gender"),
+  /** Spillerens egen vurdering av nivået sitt. */
+  level: playerLevel("level"),
   /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
   passwordHash: text("password_hash"),
   active: boolean("active").notNull().default(true),
@@ -50,6 +60,32 @@ export const sessions = pgTable(
     createdAt: timestamps.createdAt,
   },
   (t) => [index("sessions_player_idx").on(t.playerId)],
+);
+
+/**
+ * Administratorer. Egne brukere, adskilt fra spillerne, så en spillerinnlogging
+ * aldri gir admin-tilgang. Opprettes med `npm run admin:opprett`.
+ */
+export const admins = pgTable("admins", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  ...timestamps,
+});
+
+/** Innloggingsøkter for administratorer. Fungerer som `sessions`. */
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: text("id").primaryKey(),
+    adminId: integer("admin_id")
+      .notNull()
+      .references(() => admins.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [index("admin_sessions_admin_idx").on(t.adminId)],
 );
 
 /** En sesong av torsdagsligaen, f.eks. «Høst 2026». */

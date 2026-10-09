@@ -27,7 +27,7 @@ async function UserNav() {
     <nav className="flex items-center gap-4 text-sm">
       {player ? (
         <>
-          <span className="text-zinc-600 dark:text-zinc-400">{player.name}</span>
+          <span className="text-zinc-600 dark:text-zinc-400">{player.firstName} {player.lastName}</span>
           <form action={logout}>
             <button type="submit" className="font-medium underline">
               Logg ut

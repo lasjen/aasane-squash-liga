@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import { GENDERS, LEVELS } from "@/lib/player-options";
+
 const email = z
   .string()
   .trim()
@@ -8,20 +10,27 @@ const email = z
 
 export const registerSchema = z
   .object({
-    name: z
+    firstName: z
       .string()
       .trim()
-      .min(2, { error: "Navnet må ha minst 2 tegn." })
-      .max(100, { error: "Navnet kan ha maks 100 tegn." }),
+      .min(1, { error: "Skriv inn fornavnet ditt." })
+      .max(60, { error: "Fornavnet kan ha maks 60 tegn." }),
+    lastName: z
+      .string()
+      .trim()
+      .min(1, { error: "Skriv inn etternavnet ditt." })
+      .max(60, { error: "Etternavnet kan ha maks 60 tegn." }),
+    gender: z.enum(GENDERS, { error: "Velg kjønn." }),
+    level: z.enum(LEVELS, { error: "Velg nivået ditt." }),
     email,
     phone: z
       .string()
       .trim()
       .transform((v) => v.replace(/\s+/g, ""))
-      .refine((v) => v === "" || /^\+?\d{8,15}$/.test(v), {
-        error: "Skriv inn et gyldig telefonnummer, f.eks. 412 34 567.",
-      })
-      .transform((v) => v || null),
+      .refine((v) => v !== "", { error: "Skriv inn mobilnummeret ditt.", abort: true })
+      .refine((v) => /^\+?\d{8,15}$/.test(v), {
+        error: "Skriv inn et gyldig mobilnummer, f.eks. 412 34 567.",
+      }),
     password: z
       .string()
       .min(8, { error: "Passordet må ha minst 8 tegn." })
@@ -47,5 +56,13 @@ export type FormState<TField extends string> =
     }
   | undefined;
 
-export type RegisterField = "name" | "email" | "phone" | "password" | "confirmPassword";
+export type RegisterField =
+  | "firstName"
+  | "lastName"
+  | "gender"
+  | "level"
+  | "email"
+  | "phone"
+  | "password"
+  | "confirmPassword";
 export type LoginField = "email" | "password";
