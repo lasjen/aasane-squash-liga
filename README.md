@@ -13,6 +13,7 @@ npm install
 cp .env.example .env      # databaseoppsett for lokal utvikling
 npm run db:up             # starter PostgreSQL i Docker
 npm run db:migrate        # oppretter tabellene
+npm run db:seed           # legger inn testdata
 npm run dev
 ```
 
@@ -57,6 +58,26 @@ Drizzle holder oversikt i tabellen `drizzle.__drizzle_migrations`.
 
 Ikke rediger en migrasjon som allerede er kjørt i produksjon. Lag en ny i
 stedet.
+
+### Testdata
+
+Testdataene ligger i `src/db/seed/`. Akkurat nå er det 20 fiktive spillere
+med e-postadresser på `example.com`.
+
+| Kommando           | Hva den gjør                                              |
+| ------------------ | --------------------------------------------------------- |
+| `npm run db:seed`  | Legger til testdata som mangler. Trygt å kjøre flere ganger |
+| `npm run db:reset` | Tømmer **alle** tabeller og legger testdataene inn på nytt |
+
+Begge kommandoene nekter å kjøre mot en database som ikke er lokal, og når
+`NODE_ENV=production`. Testdata hører bare hjemme i utviklingsdatabasen.
+
+For å starte helt fra bunnen, med tomt skjema og alt:
+
+```bash
+docker compose down -v    # sletter databasevolumet
+npm run db:up && npm run db:migrate && npm run db:seed
+```
 
 ## Nyttige kommandoer
 
