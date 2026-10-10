@@ -8,7 +8,7 @@ import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
 import { formatRoundDate } from "@/lib/dates";
 import { MAX_PLAYERS } from "@/lib/groups";
-import { findNextRound, getSignups } from "@/lib/rounds";
+import { findNextRound, getSignups, getUpcomingCancellations } from "@/lib/rounds";
 
 export const metadata: Metadata = { title: "Påmelding – Torsdagsligaen" };
 
@@ -35,19 +35,23 @@ async function Signup({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const player = await requirePlayer();
-  const [{ date, round }, params, [me]] = await Promise.all([
+  const [{ date, round }, params, [me], cancellations] = await Promise.all([
     findNextRound(),
     searchParams,
     db
       .select({ active: schema.players.active })
       .from(schema.players)
       .where(eq(schema.players.id, player.id)),
+    getUpcomingCancellations(),
   ]);
   const signups = round ? await getSignups(round.id) : [];
   const position = signups.findIndex((s) => s.playerId === player.id) + 1;
   const signedUp = position > 0;
   const onWaitlist = position > MAX_PLAYERS;
   const participants = signups.slice(0, MAX_PLAYERS);
+  // Avlyste torsdager før neste runde vises som en notis, senere avlysninger som en liste.
+  const skipped = cancellations.filter((c) => c.date < date);
+  const later = cancellations.filter((c) => c.date > date);
   const waitlist = signups.slice(MAX_PLAYERS);
   const message = typeof params.melding === "string" ? MESSAGES[params.melding] : undefined;
 
@@ -110,6 +114,37 @@ async function Signup({
           </form>
         )}
       </section>
+
+      {skipped.length > 0 && (
+        <section
+          role="status"
+          className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950"
+        >
+          {skipped.map((c) => (
+            <div key={c.date} className="flex flex-col gap-0.5">
+              <p className="font-semibold">
+                <span className="inline-block first-letter:uppercase">{formatRoundDate(c.date)}</span> er
+                avlyst.
+              </p>
+              {c.reason && <p className="whitespace-pre-line">{c.reason}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {later.length > 0 && (
+        <section className="flex flex-col gap-1 text-sm">
+          <h2 className="font-medium text-zinc-600 dark:text-zinc-400">Senere torsdager uten liga</h2>
+          <ul className="text-zinc-600 dark:text-zinc-400">
+            {later.map((c) => (
+              <li key={c.date}>
+                <span className="inline-block first-letter:uppercase">{formatRoundDate(c.date)}</span>
+                {c.reason && <span> – {c.reason}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">

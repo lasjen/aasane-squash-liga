@@ -39,6 +39,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
 | `rounds`           | Kampkvelder (torsdager) i en sesong, med status                |
 | `round_signups`    | Hvem som har meldt seg på en runde                             |
+| `cancelled_dates`  | Torsdager uten liga, med valgfri melding til spillerne         |
 | `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst                   |
 | `round_group_players` | Hvilken gruppe hver spiller er i                            |
 | `round_results`    | Resultatliste for avsluttede runder, med ranking før og etter  |
@@ -179,6 +180,12 @@ Fanen «Ligarunde» på `/admin/runde` styrer runden:
 - **Edit** lar admin flytte, fjerne og legge til spillere i gruppene.
   Kampene i berørte grupper settes opp på nytt.
 - **Restart runde** setter opp grupper og kamper på nytt fra påmeldingene.
+- **Avlys denne torsdagen** (før start) sletter runden og påmeldingene, og
+  påmeldingen går videre til neste torsdag med liga. Admin kan skrive en
+  melding til spillerne. Under «Torsdager uten liga» kan admin legge inn
+  framtidige datoer uten liga og fjerne avlysninger. På påmeldingssiden vises
+  avlyste torsdager før neste runde som en notis med meldingen, og senere
+  avlysninger i en egen liste.
 - **Avslutt runde** lager resultatlisten, oppdaterer rankingen og åpner
   påmeldingen til neste runde. Knappen er sperret til alle kampene har resultat.
 

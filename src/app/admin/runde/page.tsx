@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import {
+  addCancelledDate,
   addToGroup,
   addToRound,
+  cancelNextRound,
   finishRound,
   movePlayer,
+  removeCancelledDate,
   removeFromRound,
   restartRound,
   setRoundFormat,
@@ -20,11 +23,13 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth/admin-session";
-import { formatRoundDate } from "@/lib/dates";
+import { formatRoundDate, osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem } from "@/lib/groups";
 import { BEST_OF_OPTIONS, DEFAULT_BEST_OF } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
-import { findAdminRound, getGroups, getSignups } from "@/lib/rounds";
+import { findAdminRound, getGroups, getSignups, getUpcomingCancellations } from "@/lib/rounds";
+
+import { CancelRoundButton } from "./cancel-round-button";
 
 export const metadata: Metadata = { title: "Ligarunde – Admin – Torsdagsligaen" };
 
@@ -42,6 +47,16 @@ const MESSAGES: Record<string, (params: Params) => string> = {
   "feil-status": () => "Runden har endret status i mellomtiden. Se oppdatert status under.",
   format: () => "Kampformatet er lagret.",
   "mangler-resultater": () => "Runden kan ikke avsluttes før alle kampene har resultat.",
+  avlyst: (params) => {
+    const removed = Number(params.slettet) || 0;
+    return `Torsdagen er avlyst${
+      removed > 0 ? `, og ${removed} ${removed === 1 ? "påmelding" : "påmeldinger"} ble slettet` : ""
+    }. Påmeldingen gjelder nå neste torsdag med liga.`;
+  },
+  "ikke-torsdag": () => "Velg en gyldig torsdag.",
+  "dato-passert": () => "Datoen har allerede vært.",
+  "runde-startet": () => "Runden den dagen er allerede startet, og kan ikke avlyses.",
+  gjenapnet: () => "Avlysningen er fjernet, og datoen er åpen for liga igjen.",
   "format-laast": () => "Kampformatet kan ikke endres etter at det er registrert resultater.",
   "ukjent-format": () => "Velg best av 3 eller best av 5 sett.",
   antall: (params) =>
@@ -75,6 +90,7 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
   const key = typeof params.melding === "string" ? params.melding : undefined;
   const message = key && MESSAGES[key]?.(params);
   const started = round?.status === "started";
+  const signupCount = !started && round ? (await getSignups(round.id)).length : 0;
 
   return (
     <>
@@ -99,12 +115,75 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
 
       <FormatForm date={date} bestOf={round?.bestOf ?? DEFAULT_BEST_OF} roundId={round?.id ?? null} />
 
+      {!started && (
+        <CancelRoundButton
+          action={cancelNextRound.bind(null, date)}
+          dateLabel={formatRoundDate(date)}
+          signupCount={signupCount}
+        />
+      )}
+
       {started ? (
         <StartedRound roundId={round.id} bestOf={round.bestOf} editing={params.rediger === "1"} />
       ) : (
         <OpenRound date={date} roundId={round?.id ?? null} />
       )}
+
+      <CancelledDates />
     </>
+  );
+}
+
+/** Kommende torsdager uten liga, med mulighet for å legge til og fjerne datoer. */
+async function CancelledDates() {
+  const cancellations = await getUpcomingCancellations();
+
+  return (
+    <section className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+      <h2 className="font-semibold">Torsdager uten liga</h2>
+      {cancellations.length === 0 ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">Ingen kommende torsdager er avlyst.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          {cancellations.map((c) => (
+            <li key={c.date} className="flex items-center gap-3 px-4 py-2">
+              <span className="inline-block font-medium first-letter:uppercase">{formatRoundDate(c.date)}</span>
+              <span className="flex-1 text-sm text-zinc-500">{c.reason}</span>
+              <form action={removeCancelledDate.bind(null, c.date)}>
+                <PendingButton pendingText="Fjerner …" className={linkButton}>
+                  Fjern avlysning
+                </PendingButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form action={addCancelledDate} className="flex flex-wrap items-end gap-2 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">Dato (torsdag)</span>
+          <input
+            type="date"
+            name="date"
+            required
+            min={osloToday()}
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="flex min-w-48 flex-1 flex-col gap-1">
+          <span className="font-medium">Melding til spillerne (valgfritt)</span>
+          <input
+            type="text"
+            name="reason"
+            maxLength={300}
+            placeholder="F.eks. Høstferie"
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <PendingButton pendingText="Legger til …" className={secondaryButton}>
+          Legg til
+        </PendingButton>
+      </form>
+    </section>
   );
 }
 

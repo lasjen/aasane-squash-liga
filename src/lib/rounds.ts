@@ -10,14 +10,24 @@ type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /**
  * Neste runde spillerne kan melde seg på: førstkommende torsdag (i dag, hvis det er torsdag),
- * eller torsdagen etter hvis admin allerede har startet den runden.
+ * men ikke torsdager uten liga, og ikke en runde admin allerede har startet eller avsluttet.
  * `round` er null hvis ingen har meldt seg på ennå, for runden lages først ved første påmelding.
  */
 export async function findNextRound(now: Date = new Date()) {
-  let date = thursdayOnOrAfter(osloToday(now));
+  const today = osloToday(now);
+  const cancelled = new Set(
+    (
+      await db
+        .select({ date: schema.cancelledDates.date })
+        .from(schema.cancelledDates)
+        .where(gte(schema.cancelledDates.date, today))
+    ).map((c) => c.date),
+  );
 
-  // To runder holder: er denne ukens runde startet, er neste ukes runde garantert ikke det.
-  for (let i = 0; i < 2; i++) {
+  // To år fram er langt mer enn nok, selv med mange avlyste torsdager.
+  let date = thursdayOnOrAfter(today);
+  for (let i = 0; i < 104; i++, date = addDays(date, 7)) {
+    if (cancelled.has(date)) continue;
     const [round] = await db
       .select({
         id: schema.rounds.id,
@@ -29,9 +39,17 @@ export async function findNextRound(now: Date = new Date()) {
       .where(eq(schema.rounds.playedOn, date))
       .limit(1);
     if (!round || round.status === "open") return { date, round: round ?? null };
-    date = addDays(date, 7);
   }
-  return { date, round: null };
+  throw new Error("Fant ingen torsdag med liga de neste to årene.");
+}
+
+/** Kommende torsdager uten liga, fra i dag og framover. */
+export async function getUpcomingCancellations(now: Date = new Date()) {
+  return db
+    .select({ date: schema.cancelledDates.date, reason: schema.cancelledDates.reason })
+    .from(schema.cancelledDates)
+    .where(gte(schema.cancelledDates.date, osloToday(now)))
+    .orderBy(asc(schema.cancelledDates.date));
 }
 
 /**

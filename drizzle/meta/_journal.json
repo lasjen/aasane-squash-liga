@@ -113,6 +113,13 @@
       "when": 1791635562651,
       "tag": "0015_fem-spillere",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791668232499,
+      "tag": "0016_avlyste-torsdager",
+      "breakpoints": true
     }
   ]
 }

@@ -144,6 +144,20 @@ export const divisionPlayers = pgTable(
   ],
 );
 
+/**
+ * Torsdager uten ligaspill, f.eks. ferier. Neste runde hopper over disse datoene.
+ * Avlyses en runde med påmeldinger, slettes runden og påmeldingene.
+ */
+export const cancelledDates = pgTable(
+  "cancelled_dates",
+  {
+    date: date("date").primaryKey(),
+    reason: text("reason"),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [check("cancelled_dates_thursday_check", sql`extract(isodow from ${t.date}) = 4`)],
+);
+
 export const roundStatus = pgEnum("round_status", [
   "open", // påmeldingen er åpen
   "started", // admin har startet runden, grupper og kamper er satt opp

@@ -1,10 +1,11 @@
 "use server";
 
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, count, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth/admin-session";
+import { osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem, splitIntoGroups } from "@/lib/groups";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
@@ -256,4 +257,73 @@ export async function addToGroup(roundId: number, groupId: number, formData: For
   });
 
   redirect(`${EDIT_PAGE}&melding=lagt-til`);
+}
+
+/**
+ * Gjør datoen til en torsdag uten liga. Finnes det en runde med åpen påmelding den dagen,
+ * slettes den sammen med påmeldingene. Returnerer feilnøkkel eller antall slettede påmeldinger.
+ */
+async function cancelThursday(date: string, reason: string | null) {
+  if (!isValidDate(date) || new Date(`${date}T00:00:00Z`).getUTCDay() !== 4) return "ikke-torsdag";
+  if (date < osloToday()) return "dato-passert";
+
+  return db.transaction(async (tx) => {
+    const [round] = await tx
+      .select({ id: schema.rounds.id, status: schema.rounds.status })
+      .from(schema.rounds)
+      .where(eq(schema.rounds.playedOn, date))
+      .for("update");
+    if (round && round.status !== "open") return "runde-startet";
+
+    let removedSignups = 0;
+    if (round) {
+      const [{ n }] = await tx
+        .select({ n: count() })
+        .from(schema.roundSignups)
+        .where(eq(schema.roundSignups.roundId, round.id));
+      removedSignups = n;
+      // Påmeldingene slettes sammen med runden (on delete cascade).
+      await tx.delete(schema.rounds).where(eq(schema.rounds.id, round.id));
+    }
+    await tx
+      .insert(schema.cancelledDates)
+      .values({ date, reason })
+      .onConflictDoUpdate({ target: schema.cancelledDates.date, set: { reason } });
+    return removedSignups;
+  });
+}
+
+const isValidDate = (date: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().startsWith(date);
+
+function redirectAfterCancel(outcome: string | number): never {
+  if (typeof outcome === "string") redirect(`${PAGE}?melding=${outcome}`);
+  redirect(`${PAGE}?melding=avlyst&slettet=${outcome}`);
+}
+
+/** Melding til spillerne fra skjemaet, eller null hvis feltet er tomt. */
+const cancelMessage = (formData: FormData) =>
+  String(formData.get("reason") ?? "").trim().slice(0, 300) || null;
+
+/**
+ * Avlyser torsdagen som er neste runde, så påmeldingen til torsdagen etter åpner.
+ * Meldingen vises for spillerne på påmeldingssiden.
+ */
+export async function cancelNextRound(date: string, formData: FormData) {
+  await requireAdmin();
+  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData)));
+}
+
+/** Legger inn en torsdag uten liga fra skjemaet (dato og valgfri melding). Finnes datoen, oppdateres meldingen. */
+export async function addCancelledDate(formData: FormData) {
+  await requireAdmin();
+  const date = String(formData.get("date") ?? "");
+  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData)));
+}
+
+/** Åpner en avlyst torsdag igjen. */
+export async function removeCancelledDate(date: string) {
+  await requireAdmin();
+  await db.delete(schema.cancelledDates).where(eq(schema.cancelledDates.date, date));
+  redirect(`${PAGE}?melding=gjenapnet`);
 }

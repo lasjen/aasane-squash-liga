@@ -37,7 +37,10 @@ export default function RulesPage() {
 
       <Section title="Påmelding">
         <ul className={list}>
-          <li>Hver torsdag er en egen runde. Du melder deg på under «Påmelding».</li>
+          <li>
+            Hver torsdag er en egen runde. Du melder deg på under «Påmelding». Torsdager uten
+            liga, for eksempel i ferier, står også der.
+          </li>
           <li>
             Det er plass til {MAX_PLAYERS} spillere. De som melder seg på etter det, står på
             venteliste i den rekkefølgen de meldte seg på.
