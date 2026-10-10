@@ -155,6 +155,7 @@ Spillersidene er egne sider med egen adresse, vist som faner i headeren
 | Liga          | `/liga`          | Runden som er i gang. Vises bare når admin har startet en runde |
 | Ranking       | `/ranking`       | Klubbens ranking for aktive spillere                     |
 | Resultater    | `/resultater`    | Avsluttede runder med resultatliste og kamper            |
+| Regler        | `/regler`        | Ligaens regler. Tallene hentes fra koden                 |
 | Innstillinger | `/innstillinger` | Endre egen profil og bytte passord                       |
 
 Passordbytte logger spilleren ut på alle andre enheter.

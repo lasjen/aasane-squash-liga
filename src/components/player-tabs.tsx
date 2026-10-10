@@ -9,6 +9,7 @@ const TABS = [
   { href: "/liga", label: "Liga", onlyWhenLeagueOpen: true },
   { href: "/ranking", label: "Ranking" },
   { href: "/resultater", label: "Resultater" },
+  { href: "/regler", label: "Regler" },
   { href: "/innstillinger", label: "Innstillinger" },
 ];
 
