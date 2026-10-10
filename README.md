@@ -120,9 +120,10 @@ Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
   npm run admin -- ola@klubben.no --fjern
   ```
 
-- På `/admin` kan admin legge til, endre og slette spillere, og oppdatere
-  rankingen. En spiller som har spilt kamper eller vært i en divisjon blir
-  deaktivert i stedet for slettet, så resultatene beholdes.
+- På `/admin` kan admin legge til og endre spillere, og oppdatere rankingen.
+  «Slett» sletter ikke, men setter spilleren på pause (inaktiv) og tar den ut
+  av rankingen. Spillerne under rykker opp én plass. «Aktiver» tar spilleren
+  av pause, og «Oppdater ranking» gir den en ny plass.
 - Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
   admin-side og hver server action for admin. Layouten alene beskytter ikke.
 
@@ -133,7 +134,7 @@ Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
 
 1. Spillere som allerede har ranking beholder rekkefølgen sin, og hull tettes.
 2. Aktive spillere uten ranking legges under, sortert på nivå: proff,
-   erfaren, medium, ny begynner, og til slutt de uten nivå. Innen hvert nivå
+   erfaren, medium, nybegynner, og til slutt de uten nivå. Innen hvert nivå
    er rekkefølgen tilfeldig.
 3. Inaktive spillere tas ut av rankingen.
 

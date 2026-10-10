@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { deletePlayer, updateRanking } from "@/app/actions/admin-players";
+import { activatePlayer, deactivatePlayer, updateRanking } from "@/app/actions/admin-players";
 
 function PendingButton({ children, pendingText, className }: { children: string; pendingText: string; className: string }) {
   const { pending } = useFormStatus();
@@ -13,22 +14,46 @@ function PendingButton({ children, pendingText, className }: { children: string;
   );
 }
 
-export function DeletePlayerButton({ playerId, name }: { playerId: number; name: string }) {
-  return (
-    <form
-      action={deletePlayer.bind(null, playerId)}
-      onSubmit={(e) => {
-        const ok = confirm(
-          `Slette ${name}?\n\nHar spilleren spilt kamper eller vært i en divisjon, blir spilleren deaktivert i stedet, så resultatene beholdes.`,
-        );
-        if (!ok) e.preventDefault();
-      }}
-    >
-      <PendingButton
-        pendingText="Sletter …"
-        className="font-medium text-red-700 underline disabled:opacity-60 dark:text-red-400"
+/**
+ * «Slett» setter spilleren på pause. Bekreftelsen vises i raden i stedet for
+ * med window.confirm, som ikke virker i alle nettlesere og innebygde visninger.
+ */
+export function DeactivatePlayerButton({ playerId, name }: { playerId: number; name: string }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (!confirming) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="font-medium text-red-700 underline dark:text-red-400"
       >
         Slett
+      </button>
+    );
+  }
+
+  return (
+    <form action={deactivatePlayer.bind(null, playerId)} className="flex items-center gap-2">
+      <span className="text-zinc-600 dark:text-zinc-400">Sette {name} på pause?</span>
+      <PendingButton
+        pendingText="Lagrer …"
+        className="rounded bg-red-700 px-2 py-0.5 font-medium text-white disabled:opacity-60 dark:bg-red-500"
+      >
+        Bekreft
+      </PendingButton>
+      <button type="button" onClick={() => setConfirming(false)} className="font-medium underline">
+        Avbryt
+      </button>
+    </form>
+  );
+}
+
+export function ActivatePlayerButton({ playerId }: { playerId: number }) {
+  return (
+    <form action={activatePlayer.bind(null, playerId)}>
+      <PendingButton pendingText="Lagrer …" className="font-medium underline disabled:opacity-60">
+        Aktiver
       </PendingButton>
     </form>
   );

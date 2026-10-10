@@ -7,7 +7,7 @@ import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth/admin-session";
 import { GENDER_LABELS, LEVEL_LABELS } from "@/lib/player-options";
 
-import { DeletePlayerButton, UpdateRankingButton } from "./player-buttons";
+import { ActivatePlayerButton, DeactivatePlayerButton, UpdateRankingButton } from "./player-buttons";
 
 export const metadata: Metadata = { title: "Admin – Torsdagsligaen" };
 
@@ -15,10 +15,10 @@ export const metadata: Metadata = { title: "Admin – Torsdagsligaen" };
 const MESSAGES: Record<string, (params: Record<string, string | string[] | undefined>) => string> = {
   "lagt-til": () => "Spilleren er lagt til.",
   lagret: () => "Endringene er lagret.",
-  slettet: () => "Spilleren er slettet.",
-  deaktivert: () =>
-    "Spilleren har spilt kamper eller vært i en divisjon, og er derfor deaktivert i stedet for slettet.",
-  "ikke-deg-selv": () => "Du kan ikke slette deg selv.",
+  deaktivert: () => "Spilleren er satt på pause og tatt ut av rankingen.",
+  aktivert: () =>
+    "Spilleren er aktiv igjen. Trykk «Oppdater ranking» for å gi spilleren en plass i rankingen.",
+  "ikke-deg-selv": () => "Du kan ikke sette deg selv på pause.",
   ranking: (params) => {
     const count = Number(params.nye) || 0;
     return count === 0
@@ -127,7 +127,7 @@ async function PlayerTable() {
                     admin
                   </span>
                 )}
-                {!p.active && <span className="ml-2 text-xs">(inaktiv)</span>}
+                {!p.active && <span className="ml-2 text-xs">(på pause)</span>}
               </td>
               <td className="px-3 py-2">{p.email ?? "–"}</td>
               <td className="px-3 py-2 whitespace-nowrap">{p.phone ?? "–"}</td>
@@ -138,7 +138,11 @@ async function PlayerTable() {
                   <Link href={`/admin/spillere/${p.id}/endre`} className="font-medium underline">
                     Endre
                   </Link>
-                  <DeletePlayerButton playerId={p.id} name={`${p.firstName} ${p.lastName}`} />
+                  {p.active ? (
+                    <DeactivatePlayerButton playerId={p.id} name={p.firstName} />
+                  ) : (
+                    <ActivatePlayerButton playerId={p.id} />
+                  )}
                 </div>
               </td>
             </tr>

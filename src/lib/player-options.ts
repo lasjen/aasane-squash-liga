@@ -14,7 +14,7 @@ export const LEVELS = ["beginner", "intermediate", "experienced", "pro"] as cons
 export type Level = (typeof LEVELS)[number];
 
 export const LEVEL_LABELS: Record<Level, string> = {
-  beginner: "Ny begynner",
+  beginner: "Nybegynner",
   intermediate: "Medium",
   experienced: "Erfaren",
   pro: "Proff",

@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, or, sql } from "drizzle-orm";
+import { eq, gt, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
@@ -12,12 +12,29 @@ import type { FormState } from "@/lib/auth/validation";
 import { buildRanking } from "@/lib/ranking";
 
 type PlayerFormState = FormState<AdminPlayerField>;
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
 
 function isUniqueViolation(err: unknown) {
   const cause = err instanceof Error && "cause" in err ? err.cause : err;
   return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23505";
+}
+
+/** Tar spilleren ut av rankingen og lar alle under rykke opp én plass, så det ikke blir hull. */
+async function removeFromRanking(tx: Transaction, playerId: number) {
+  const [player] = await tx
+    .select({ ranking: schema.players.ranking })
+    .from(schema.players)
+    .where(eq(schema.players.id, playerId))
+    .for("update");
+  if (player?.ranking == null) return;
+
+  await tx.update(schema.players).set({ ranking: null }).where(eq(schema.players.id, playerId));
+  await tx
+    .update(schema.players)
+    .set({ ranking: sql`${schema.players.ranking} - 1` })
+    .where(gt(schema.players.ranking, player.ranking));
 }
 
 /** Leser skjemaet. Returnerer enten gyldige data eller feil klare for skjemaet. */
@@ -91,14 +108,15 @@ export async function updatePlayer(
 
   try {
     const updated = await db.transaction(async (tx) => {
+      // Inaktive spillere er ikke med i rankingen.
+      if (!player.active) await removeFromRanking(tx, playerId);
+
       const rows = await tx
         .update(schema.players)
         .set({
           ...player,
           // Tomt passordfelt betyr at passordet ikke endres.
           ...(password && { passwordHash: await hashPassword(password) }),
-          // Inaktive spillere er ikke med i rankingen.
-          ...(!player.active && { ranking: null }),
         })
         .where(eq(schema.players.id, playerId))
         .returning({ id: schema.players.id });
@@ -118,50 +136,30 @@ export async function updatePlayer(
 }
 
 /**
- * Sletter en spiller. Har spilleren spilt kamper eller vært i en divisjon,
- * blir den i stedet deaktivert, så resultater og tabeller beholdes.
+ * Setter spilleren på pause: inaktiv og ute av rankingen. Ingenting slettes,
+ * så kamper og tabeller beholdes, og spilleren kan aktiveres igjen senere.
  */
-export async function deletePlayer(playerId: number) {
+export async function deactivatePlayer(playerId: number) {
   const admin = await requireAdmin();
   if (playerId === admin.id) {
     redirect("/admin?melding=ikke-deg-selv");
   }
 
-  const outcome = await db.transaction(async (tx) => {
-    const [inMatch] = await tx
-      .select({ id: schema.matches.id })
-      .from(schema.matches)
-      .where(
-        or(
-          eq(schema.matches.player1Id, playerId),
-          eq(schema.matches.player2Id, playerId),
-          eq(schema.matches.winnerId, playerId),
-        ),
-      )
-      .limit(1);
-    const [inDivision] = await tx
-      .select({ playerId: schema.divisionPlayers.playerId })
-      .from(schema.divisionPlayers)
-      .where(eq(schema.divisionPlayers.playerId, playerId))
-      .limit(1);
-
-    if (inMatch || inDivision) {
-      await tx
-        .update(schema.players)
-        .set({ active: false, isAdmin: false, ranking: null })
-        .where(eq(schema.players.id, playerId));
-      // Logger spilleren ut overalt.
-      await tx.delete(schema.sessions).where(eq(schema.sessions.playerId, playerId));
-      await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
-      return "deaktivert";
-    }
-
-    // Økter slettes automatisk (on delete cascade).
-    await tx.delete(schema.players).where(eq(schema.players.id, playerId));
-    return "slettet";
+  await db.transaction(async (tx) => {
+    await removeFromRanking(tx, playerId);
+    await tx.update(schema.players).set({ active: false }).where(eq(schema.players.id, playerId));
+    // Inaktive spillere kan ikke være innlogget som admin.
+    await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
   });
 
-  redirect(`/admin?melding=${outcome}`);
+  redirect("/admin?melding=deaktivert");
+}
+
+/** Tar spilleren av pause. Plass i rankingen får spilleren ved neste «Oppdater ranking». */
+export async function activatePlayer(playerId: number) {
+  await requireAdmin();
+  await db.update(schema.players).set({ active: true }).where(eq(schema.players.id, playerId));
+  redirect("/admin?melding=aktivert");
 }
 
 /**
