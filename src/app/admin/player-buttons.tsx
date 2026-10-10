@@ -1,18 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useFormStatus } from "react-dom";
 
 import { activatePlayer, deactivatePlayer, updateRanking } from "@/app/actions/admin-players";
-
-function PendingButton({ children, pendingText, className }: { children: string; pendingText: string; className: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className={className}>
-      {pending ? pendingText : children}
-    </button>
-  );
-}
+import { PendingButton } from "@/components/pending-button";
 
 /**
  * «Slett» setter spilleren på pause. Bekreftelsen vises i raden i stedet for

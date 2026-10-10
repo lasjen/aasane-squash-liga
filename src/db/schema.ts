@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   date,
@@ -143,6 +144,12 @@ export const divisionPlayers = pgTable(
   ],
 );
 
+export const roundStatus = pgEnum("round_status", [
+  "open", // påmeldingen er åpen
+  "started", // admin har startet runden, grupper og kamper er satt opp
+  "finished", // alle kamper er ferdig registrert
+]);
+
 /** En kampkveld (torsdag) i en sesong. */
 export const rounds = pgTable(
   "rounds",
@@ -153,11 +160,36 @@ export const rounds = pgTable(
       .references(() => seasons.id, { onDelete: "cascade" }),
     number: smallint("number").notNull(),
     playedOn: date("played_on").notNull(),
+    status: roundStatus("status").notNull().default("open"),
+    /** Kampformat: best av 3 eller best av 5 sett. */
+    bestOf: smallint("best_of").notNull().default(3),
     ...timestamps,
   },
   (t) => [
     unique("rounds_season_number_unique").on(t.seasonId, t.number),
     unique("rounds_season_date_unique").on(t.seasonId, t.playedOn),
+    check("rounds_best_of_check", sql`${t.bestOf} IN (3, 5)`),
+  ],
+);
+
+/**
+ * Hvem som har meldt seg på en runde. Spillere melder seg på selv,
+ * og admin kan legge til eller fjerne spillere ved oppmøte.
+ */
+export const roundSignups = pgTable(
+  "round_signups",
+  {
+    roundId: integer("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [
+    primaryKey({ columns: [t.roundId, t.playerId] }),
+    index("round_signups_player_idx").on(t.playerId),
   ],
 );
 
@@ -168,7 +200,103 @@ export const matchStatus = pgEnum("match_status", [
   "cancelled", // avlyst
 ]);
 
-/** En kamp mellom to spillere i samme divisjon på en kampkveld. */
+/** Gruppene i en runde. Gruppe 1 er øverst (best rangerte spillere). */
+export const roundGroups = pgTable(
+  "round_groups",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    roundId: integer("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    number: smallint("number").notNull(),
+  },
+  (t) => [
+    unique("round_groups_round_number_unique").on(t.roundId, t.number),
+    // Trengs for den sammensatte fremmednøkkelen fra round_group_players.
+    unique("round_groups_id_round_unique").on(t.id, t.roundId),
+    check("round_groups_number_check", sql`${t.number} >= 1`),
+  ],
+);
+
+/** Hvilken gruppe en spiller er i. En spiller kan bare være i én gruppe per runde. */
+export const roundGroupPlayers = pgTable(
+  "round_group_players",
+  {
+    roundId: integer("round_id").notNull(),
+    groupId: integer("group_id").notNull(),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.groupId, t.playerId] }),
+    unique("round_group_players_round_player_unique").on(t.roundId, t.playerId),
+    foreignKey({
+      name: "round_group_players_group_fk",
+      columns: [t.groupId, t.roundId],
+      foreignColumns: [roundGroups.id, roundGroups.roundId],
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * Resultatlisten for en avsluttet runde: én rad per deltaker, i endelig rekkefølge
+ * på tvers av gruppene, med ranking før og etter runden.
+ */
+export const roundResults = pgTable(
+  "round_results",
+  {
+    roundId: integer("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Plass i resultatlisten, fra 1. */
+    position: smallint("position").notNull(),
+    groupNumber: smallint("group_number").notNull(),
+    /** Plass i egen gruppe, fra 1. */
+    groupPosition: smallint("group_position").notNull(),
+    wins: smallint("wins").notNull(),
+    losses: smallint("losses").notNull(),
+    setsWon: smallint("sets_won").notNull(),
+    setsLost: smallint("sets_lost").notNull(),
+    rankingBefore: integer("ranking_before"),
+    rankingAfter: integer("ranking_after"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.roundId, t.playerId] }),
+    unique("round_results_round_position_unique").on(t.roundId, t.position),
+  ],
+);
+
+/**
+ * Rankingen slik den var før runden, for alle aktive rangerte spillere. Lagres når runden
+ * avsluttes, så resultatlisten og ny ranking kan regnes ut på nytt hvis et resultat rettes.
+ */
+export const roundRankingSnapshots = pgTable(
+  "round_ranking_snapshots",
+  {
+    roundId: integer("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    playerId: integer("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    ranking: integer("ranking").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.roundId, t.playerId] })],
+);
+
+/** Om en spiller i en kamp er vinneren eller taperen fra en tidligere kamp. */
+export const matchSourceResult = pgEnum("match_source_result", ["winner", "loser"]);
+
+/**
+ * En kamp i en gruppe på en kampkveld. I grupper på 4 avhenger de to siste kampene
+ * av resultatene i de to første (vinner mot vinner, taper mot taper). Da er spilleren
+ * null til resultatet finnes, og `playerXSourceMatchId`/`playerXSourceResult` sier
+ * hvor spilleren kommer fra.
+ */
 export const matches = pgTable(
   "matches",
   {
@@ -176,24 +304,78 @@ export const matches = pgTable(
     roundId: integer("round_id")
       .notNull()
       .references(() => rounds.id, { onDelete: "cascade" }),
-    divisionId: integer("division_id")
+    groupId: integer("group_id")
       .notNull()
-      .references(() => divisions.id, { onDelete: "cascade" }),
-    player1Id: integer("player1_id")
-      .notNull()
-      .references(() => players.id, { onDelete: "restrict" }),
-    player2Id: integer("player2_id")
-      .notNull()
-      .references(() => players.id, { onDelete: "restrict" }),
+      .references(() => roundGroups.id, { onDelete: "cascade" }),
+    /** Rekkefølgen kampene spilles i innenfor gruppen, fra 1. */
+    number: smallint("number").notNull(),
+    player1Id: integer("player1_id").references(() => players.id, { onDelete: "restrict" }),
+    player2Id: integer("player2_id").references(() => players.id, { onDelete: "restrict" }),
+    player1SourceMatchId: integer("player1_source_match_id").references(
+      (): AnyPgColumn => matches.id,
+      { onDelete: "cascade" },
+    ),
+    player1SourceResult: matchSourceResult("player1_source_result"),
+    player2SourceMatchId: integer("player2_source_match_id").references(
+      (): AnyPgColumn => matches.id,
+      { onDelete: "cascade" },
+    ),
+    player2SourceResult: matchSourceResult("player2_source_result"),
+    /** I 5-grupper: hvilken pulje kampen hører til ("A" eller "B"). Null ellers. */
+    pool: text("pool"),
+    /**
+     * I 5-grupper: spilleren er nr. 1 eller 2 i pulje A i samme gruppe.
+     * Fylles inn når alle kampene i pulje A har resultat.
+     */
+    player1SourcePoolRank: smallint("player1_source_pool_rank"),
+    player2SourcePoolRank: smallint("player2_source_pool_rank"),
     court: smallint("court"),
     status: matchStatus("status").notNull().default("scheduled"),
     winnerId: integer("winner_id").references(() => players.id, { onDelete: "restrict" }),
+    /** Vunne game for hver spiller, f.eks. 3 og 1. Null før resultatet er registrert. */
+    player1Games: smallint("player1_games"),
+    player2Games: smallint("player2_games"),
+    /** Hvem som sist registrerte resultatet (spiller eller admin). */
+    reportedById: integer("reported_by_id").references(() => players.id, { onDelete: "set null" }),
+    reportedAt: timestamp("reported_at", { withTimezone: true }),
+    /**
+     * Satt når resultatet er bekreftet, av motspilleren eller av en admin.
+     * Et spilt resultat uten bekreftelse venter på motspilleren.
+     */
+    confirmedById: integer("confirmed_by_id").references(() => players.id, { onDelete: "set null" }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
     index("matches_round_idx").on(t.roundId),
-    index("matches_division_idx").on(t.divisionId),
+    check(
+      "matches_games_check",
+      sql`(${t.player1Games} IS NULL) = (${t.player2Games} IS NULL)
+        AND (${t.player1Games} IS NULL OR (${t.player1Games} BETWEEN 0 AND 3
+          AND ${t.player2Games} BETWEEN 0 AND 3 AND ${t.player1Games} <> ${t.player2Games}))`,
+    ),
+    check(
+      "matches_played_games_check",
+      sql`${t.status} <> 'played' OR ${t.player1Games} IS NOT NULL`,
+    ),
+    index("matches_group_idx").on(t.groupId),
+    unique("matches_group_number_unique").on(t.groupId, t.number),
     check("matches_distinct_players_check", sql`${t.player1Id} <> ${t.player2Id}`),
+    // Hver spillerplass har enten en spiller eller en kilde (eller begge, når kilden er avgjort).
+    check(
+      "matches_player1_known_check",
+      sql`${t.player1Id} IS NOT NULL OR ${t.player1SourceMatchId} IS NOT NULL OR ${t.player1SourcePoolRank} IS NOT NULL`,
+    ),
+    check(
+      "matches_player2_known_check",
+      sql`${t.player2Id} IS NOT NULL OR ${t.player2SourceMatchId} IS NOT NULL OR ${t.player2SourcePoolRank} IS NOT NULL`,
+    ),
+    check("matches_pool_check", sql`${t.pool} IS NULL OR ${t.pool} IN ('A', 'B')`),
+    check(
+      "matches_pool_rank_check",
+      sql`(${t.player1SourcePoolRank} IS NULL OR ${t.player1SourcePoolRank} IN (1, 2))
+        AND (${t.player2SourcePoolRank} IS NULL OR ${t.player2SourcePoolRank} IN (1, 2))`,
+    ),
     check(
       "matches_winner_check",
       sql`${t.winnerId} IS NULL OR ${t.winnerId} IN (${t.player1Id}, ${t.player2Id})`,

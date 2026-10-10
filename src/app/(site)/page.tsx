@@ -45,7 +45,17 @@ async function Welcome() {
   const player = await getCurrentPlayer();
 
   if (player) {
-    return <p className="font-medium">Hei, {player.firstName}!</p>;
+    return (
+      <div className="mt-2 flex flex-col items-start gap-3">
+        <p className="font-medium">Hei, {player.firstName}!</p>
+        <Link
+          href="/pamelding"
+          className="rounded-md bg-zinc-900 px-4 py-2.5 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          Gå til påmelding
+        </Link>
+      </div>
+    );
   }
   return (
     <Link

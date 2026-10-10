@@ -14,6 +14,7 @@ import {
   type LoginField,
   type RegisterField,
 } from "@/lib/auth/validation";
+import { playerHomePath } from "@/lib/rounds";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
 
@@ -70,7 +71,7 @@ export async function register(
   }
 
   await createSession(playerId);
-  redirect("/");
+  redirect(await playerHomePath());
 }
 
 export async function login(
@@ -102,7 +103,7 @@ export async function login(
   }
 
   await createSession(player.id);
-  redirect("/");
+  redirect(await playerHomePath());
 }
 
 export async function logout() {

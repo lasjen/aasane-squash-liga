@@ -50,6 +50,69 @@
       "when": 1791587372324,
       "tag": "0006_spillerranking",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791619358586,
+      "tag": "0007_runde-pamelding",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791632406669,
+      "tag": "0008_runde-grupper",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791632877362,
+      "tag": "0009_kamper-i-grupper",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791632888049,
+      "tag": "0010_kamper-uten-divisjon",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791633357274,
+      "tag": "0011_kampresultater",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791634417639,
+      "tag": "0012_kampformat-og-resultatliste",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791634432851,
+      "tag": "0013_resultatliste",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791634946781,
+      "tag": "0014_ranking-for-runde",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1791635562651,
+      "tag": "0015_fem-spillere",
+      "breakpoints": true
     }
   ]
 }

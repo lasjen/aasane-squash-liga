@@ -1,11 +1,13 @@
 import "server-only";
 
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, ne, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { db, schema } from "@/db";
+
+import { playerHomePath } from "@/lib/rounds";
 
 import { hashToken, newSessionToken } from "./tokens";
 
@@ -38,6 +40,15 @@ export async function deleteSession() {
     await db.delete(schema.sessions).where(eq(schema.sessions.id, hashToken(token)));
   }
   cookieStore.delete(COOKIE_NAME);
+}
+
+/** Logger spilleren ut overalt unntatt i denne nettleseren, f.eks. etter passordbytte. */
+export async function deleteOtherSessions(playerId: number) {
+  const token = (await cookies()).get(COOKIE_NAME)?.value;
+  const current = token ? hashToken(token) : "";
+  await db
+    .delete(schema.sessions)
+    .where(and(eq(schema.sessions.playerId, playerId), ne(schema.sessions.id, current)));
 }
 
 /** Den innloggede spilleren, eller null. Memoisert per forespørsel. */
@@ -73,7 +84,7 @@ export async function requirePlayer() {
  * Sender innloggede spillere videre (f.eks. bort fra /logg-inn).
  * Rendres inni <Suspense> fordi den leser cookien.
  */
-export async function RedirectIfLoggedIn({ to = "/" }: { to?: string }) {
-  if (await getCurrentPlayer()) redirect(to);
+export async function RedirectIfLoggedIn({ to }: { to?: string }) {
+  if (await getCurrentPlayer()) redirect(to ?? (await playerHomePath()));
   return null;
 }

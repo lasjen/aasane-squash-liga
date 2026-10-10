@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { logout } from "@/app/actions/auth";
+import { PlayerTabs } from "@/components/player-tabs";
 import { getCurrentPlayer } from "@/lib/auth/session";
+import { findStartedRound } from "@/lib/rounds";
 
 export function SiteHeader() {
   return (
@@ -16,8 +18,18 @@ export function SiteHeader() {
           <UserNav />
         </Suspense>
       </div>
+      <Suspense fallback={null}>
+        <TabsForPlayer />
+      </Suspense>
     </header>
   );
+}
+
+/** Fanene vises bare for innloggede spillere. */
+async function TabsForPlayer() {
+  const player = await getCurrentPlayer();
+  if (!player) return null;
+  return <PlayerTabs leagueOpen={(await findStartedRound()) !== null} />;
 }
 
 async function UserNav() {

@@ -4,11 +4,13 @@ import { Suspense } from "react";
 import { adminLogout } from "@/app/actions/admin-auth";
 import { getCurrentAdmin } from "@/lib/auth/admin-session";
 
+import { AdminTabs } from "./admin-tabs";
+
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <>
       <header className="border-b border-zinc-200 bg-zinc-900 text-white dark:border-zinc-800">
-        <div className="mx-auto flex min-h-14 w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto flex min-h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
           <Link href="/admin" className="font-semibold tracking-tight">
             Torsdagsligaen <span className="font-normal text-zinc-400">· Admin</span>
           </Link>
@@ -17,10 +19,18 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
             <AdminNav />
           </Suspense>
         </div>
+        <Suspense fallback={null}>
+          <TabsForAdmin />
+        </Suspense>
       </header>
       {children}
     </>
   );
+}
+
+/** Fanene vises bare for innloggede administratorer. */
+async function TabsForAdmin() {
+  return (await getCurrentAdmin()) ? <AdminTabs /> : null;
 }
 
 async function AdminNav() {

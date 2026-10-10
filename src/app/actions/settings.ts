@@ -1,0 +1,95 @@
+"use server";
+
+import { eq } from "drizzle-orm";
+import { refresh } from "next/cache";
+import * as z from "zod";
+
+import { db, schema } from "@/db";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { deleteOtherSessions, requirePlayer } from "@/lib/auth/session";
+import {
+  changePasswordSchema,
+  profileSchema,
+  type ChangePasswordField,
+  type FormState,
+  type ProfileField,
+} from "@/lib/auth/validation";
+
+/** Som FormState, men med `saved` når lagringen gikk bra. */
+export type SettingsState<TField extends string> =
+  | (NonNullable<FormState<TField>> & { saved?: boolean })
+  | undefined;
+
+const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
+
+function isUniqueViolation(err: unknown) {
+  const cause = err instanceof Error && "cause" in err ? err.cause : err;
+  return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23505";
+}
+
+export async function updateProfile(
+  _prev: SettingsState<ProfileField>,
+  formData: FormData,
+): Promise<SettingsState<ProfileField>> {
+  const player = await requirePlayer();
+
+  const values = {
+    firstName: text(formData, "firstName"),
+    lastName: text(formData, "lastName"),
+    gender: text(formData, "gender"),
+    level: text(formData, "level"),
+    email: text(formData, "email"),
+    phone: text(formData, "phone"),
+  };
+  const parsed = profileSchema.safeParse(values);
+  if (!parsed.success) {
+    return { errors: z.flattenError(parsed.error).fieldErrors, values };
+  }
+
+  try {
+    await db.update(schema.players).set(parsed.data).where(eq(schema.players.id, player.id));
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { errors: { email: ["En annen spiller bruker allerede denne e-postadressen."] }, values };
+    }
+    throw err;
+  }
+
+  // Navnet i headeren skal oppdateres med en gang.
+  refresh();
+  return { saved: true };
+}
+
+export async function changePassword(
+  _prev: SettingsState<ChangePasswordField>,
+  formData: FormData,
+): Promise<SettingsState<ChangePasswordField>> {
+  const player = await requirePlayer();
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: text(formData, "currentPassword"),
+    password: text(formData, "password"),
+    confirmPassword: text(formData, "confirmPassword"),
+  });
+  if (!parsed.success) {
+    return { errors: z.flattenError(parsed.error).fieldErrors };
+  }
+
+  const [row] = await db
+    .select({ passwordHash: schema.players.passwordHash })
+    .from(schema.players)
+    .where(eq(schema.players.id, player.id));
+  const ok = row?.passwordHash && (await verifyPassword(parsed.data.currentPassword, row.passwordHash));
+  if (!ok) {
+    return { errors: { currentPassword: ["Passordet er feil."] } };
+  }
+
+  await db
+    .update(schema.players)
+    .set({ passwordHash: await hashPassword(parsed.data.password) })
+    .where(eq(schema.players.id, player.id));
+  await deleteOtherSessions(player.id);
+
+  refresh();
+  return { saved: true };
+}

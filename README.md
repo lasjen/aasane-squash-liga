@@ -37,8 +37,13 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `seasons`          | Sesonger av ligaen, f.eks. «Høst 2026»                         |
 | `divisions`        | Divisjoner per sesong, nivå 1 er øverst                        |
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
-| `rounds`           | Kampkvelder (torsdager) i en sesong                            |
-| `matches`          | Kamper mellom to spillere, med status og vinner                |
+| `rounds`           | Kampkvelder (torsdager) i en sesong, med status                |
+| `round_signups`    | Hvem som har meldt seg på en runde                             |
+| `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst                   |
+| `round_group_players` | Hvilken gruppe hver spiller er i                            |
+| `round_results`    | Resultatliste for avsluttede runder, med ranking før og etter  |
+| `round_ranking_snapshots` | Hele rankingen slik den var før runden ble avsluttet    |
+| `matches`          | Kamper i en gruppe, med status og vinner                       |
 | `match_games`      | Poeng per game i en kamp (best av fem)                         |
 | `sessions`         | Innloggingsøkter (lagrer bare en hash av tokenet)              |
 
@@ -126,6 +131,100 @@ Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
   av pause, og «Oppdater ranking» gir den en ny plass.
 - Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
   admin-side og hver server action for admin. Layouten alene beskytter ikke.
+
+### Påmelding
+
+Innloggede spillere havner på `/pamelding` og melder seg på neste runde der.
+
+- Neste runde er førstkommende torsdag i norsk tid, eller i dag hvis det er
+  torsdag. Er den runden startet, blir neste torsdag neste runde.
+- Runden lages første gang noen melder seg på. Finnes ingen sesong som dekker
+  datoen, lages «Vår ÅÅÅÅ» (januar–juni) eller «Høst ÅÅÅÅ» (juli–desember).
+- Spillere kan melde seg av helt til admin starter runden.
+- Spillere på pause kan ikke melde seg på.
+- Logikken ligger i `src/lib/rounds.ts` og `src/lib/dates.ts`.
+
+### Spillersidene
+
+Spillersidene er egne sider med egen adresse, vist som faner i headeren
+(`src/components/player-tabs.tsx`). Nye sider legges til i `TABS` der.
+
+| Fane          | Adresse          | Innhold                                                  |
+| ------------- | ---------------- | -------------------------------------------------------- |
+| Påmelding     | `/pamelding`     | Meld deg på eller av neste runde                         |
+| Liga          | `/liga`          | Runden som er i gang. Vises bare når admin har startet en runde |
+| Ranking       | `/ranking`       | Klubbens ranking for aktive spillere                     |
+| Resultater    | `/resultater`    | Avsluttede runder med resultatliste og kamper            |
+| Innstillinger | `/innstillinger` | Endre egen profil og bytte passord                       |
+
+Passordbytte logger spilleren ut på alle andre enheter.
+
+### Ligarunden (admin)
+
+Fanen «Ligarunde» på `/admin/runde` styrer runden:
+
+- **Før start:** påmeldte (maks 16), venteliste og andre aktive spillere.
+  Admin kan legge til spillere og fjerne dem som ikke møter. Neste på
+  ventelisten rykker da opp.
+- **Start runde** setter opp grupper og kamper. Spillerne sorteres etter
+  ranking og deles i grupper på 3 og 4 (`src/lib/groups.ts`): 4 → [4],
+  6 → [3, 3], 7 → [3, 4], 16 → [4, 4, 4, 4]. 5 spillere blir én gruppe på 5.
+- **Kamper** (`src/lib/match-plan.ts`): i grupper på 3 spiller alle mot alle
+  (1–2, 2–3, 1–3). I grupper på 4 spiller 1 mot 4 og 2 mot 3, deretter
+  vinner mot vinner og taper mot taper. I gruppen på 5 fordeles spillerne
+  etter slangeprinsippet i pulje A (1, 4, 5) og pulje B (2, 3). A spiller alle
+  mot alle og B én kamp. Så spiller nr. 1 i A mot vinner av B om 1. plass, og
+  nr. 2 i A mot taper av B om 3. plass. Nr. 3 i A blir nr. 5.
+- **Edit** lar admin flytte, fjerne og legge til spillere i gruppene.
+  Kampene i berørte grupper settes opp på nytt.
+- **Restart runde** setter opp grupper og kamper på nytt fra påmeldingene.
+- **Avslutt runde** lager resultatlisten, oppdaterer rankingen og åpner
+  påmeldingen til neste runde. Knappen er sperret til alle kampene har resultat.
+
+### Resultatliste og ranking
+
+Når runden avsluttes (`src/lib/standings.ts` og `src/lib/round-results.ts`):
+
+1. **Plass i gruppen.** Grupper på 4: vinner og taper av vinnerkampen (kamp 3),
+   så vinner og taper av taperkampen (kamp 4). Grupper på 3: flest seire, så
+   settdifferanse, vunne sett, innbyrdes oppgjør og ranking før runden.
+2. **Resultatliste.** Gruppene settes etter hverandre, men vinneren av hver
+   gruppe bytter plass med sistemann i gruppen over: G1 [a1, a2, a3, a4] og
+   G2 [b1, b2, b3] gir a1, a2, a3, b1, a4, b2, b3.
+3. **Ranking.** Spillere som ikke var med, rykker 2 plasser ned. Plassene som
+   blir igjen, fordeles på deltakerne i resultatlistens rekkefølge.
+
+Avsluttede runder vises under fanen «Resultater» for både spillere
+(`/resultater`) og admin (`/admin/resultater`).
+
+**Rette resultater etterpå.** På admin-siden for en avsluttet runde kan admin
+registrere og rette resultater. Resultatlisten og rankingen regnes da ut på
+nytt fra rankingen før runden (`round_ranking_snapshots`), så utregningen gir
+samme svar uansett hvor mange ganger den gjøres. Det går bare for den sist
+avsluttede runden, og ikke mens en annen runde er i gang. Runder som ble
+avsluttet før rankingen ble lagret, bruker dagens ranking som utgangspunkt.
+
+Mens en runde er i gang, havner spillerne på `/liga` etter innlogging og ser
+gruppen og kampene sine der.
+
+### Resultater
+
+Admin velger kampformat per runde under Ligarunde: best av 3 sett (standard)
+eller best av 5. Resultatet er antall vunne sett, f.eks. 2–1 (`src/lib/score.ts`).
+Formatet låses når første resultat er registrert.
+
+- Spilleren registrerer resultat for egne kamper under «Dine kamper» på
+  `/liga`. Resultatet venter da på at motspilleren bekrefter.
+- Motspilleren kan bekrefte eller rette. Retter motspilleren, må den første
+  spilleren bekrefte. Et bekreftet resultat kan bare endres av admin.
+- Admin ser alle kampene på `/admin/runde` og kan registrere eller endre
+  resultater. Det admin registrerer er bekreftet med en gang.
+- I grupper på 4 fylles vinner og taper fra kamp 1 og 2 inn i kamp 3 og 4 så
+  snart resultatet er registrert. Endres et resultat slik at en senere kamp får
+  andre spillere, nullstilles resultatet i den kampen
+  (`src/lib/match-results.ts`).
+- Restart og endringer i gruppene under Edit setter opp kampene på nytt, og
+  registrerte resultater i de berørte gruppene slettes.
 
 ### Ranking
 
