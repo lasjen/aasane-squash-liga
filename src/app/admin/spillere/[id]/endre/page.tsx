@@ -33,7 +33,8 @@ async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
     .from(schema.players)
     .where(eq(schema.players.id, id))
     .limit(1);
-  if (!player) notFound();
+  // Slettede spillere kan ikke redigeres.
+  if (!player || player.deletedAt) notFound();
 
   return (
     <PlayerForm

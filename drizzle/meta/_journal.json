@@ -120,6 +120,13 @@
       "when": 1791668232499,
       "tag": "0016_avlyste-torsdager",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791669850839,
+      "tag": "0017_skjult-avlysning-og-slettet-spiller",
+      "breakpoints": true
     }
   ]
 }

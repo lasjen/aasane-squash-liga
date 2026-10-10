@@ -127,9 +127,14 @@ Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
   ```
 
 - På `/admin` kan admin legge til og endre spillere, og oppdatere rankingen.
-  «Slett» sletter ikke, men setter spilleren på pause (inaktiv) og tar den ut
-  av rankingen. Spillerne under rykker opp én plass. «Aktiver» tar spilleren
-  av pause, og «Oppdater ranking» gir den en ny plass.
+  «Deaktiver» setter spilleren på pause (inaktiv) og tar den ut av
+  rankingen. Spillerne under rykker opp én plass. «Aktiver» tar spilleren av
+  pause, og «Oppdater ranking» gir den en ny plass.
+- «Slett» fjerner spilleren for godt: navn, e-post, mobil, nivå, passord,
+  admin-tilgang, ranking, påmeldinger og innlogginger fjernes. Raden beholdes
+  med navnet «Tidligere spiller» (og `deleted_at` satt), så tidligere kamper og
+  resultatlister beholder resultatene sine. Spillere i en runde som pågår må
+  fjernes fra runden først.
 - Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
   admin-side og hver server action for admin. Layouten alene beskytter ikke.
 
@@ -183,7 +188,9 @@ Fanen «Ligarunde» på `/admin/runde` styrer runden:
 - **Avlys denne torsdagen** (før start) sletter runden og påmeldingene, og
   påmeldingen går videre til neste torsdag med liga. Admin kan skrive en
   melding til spillerne. Under «Torsdager uten liga» kan admin legge inn
-  framtidige datoer uten liga og fjerne avlysninger. På påmeldingssiden vises
+  framtidige datoer uten liga, endre meldingen og fjerne avlysninger. En
+  avlysning kan skjules for spillerne («Ikke vis for spillerne»); datoen
+  hoppes likevel over. På påmeldingssiden vises
   avlyste torsdager før neste runde som en notis med meldingen, og senere
   avlysninger i en egen liste.
 - **Avslutt runde** lager resultatlisten, oppdaterer rankingen og åpner

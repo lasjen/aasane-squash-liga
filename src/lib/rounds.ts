@@ -43,13 +43,21 @@ export async function findNextRound(now: Date = new Date()) {
   throw new Error("Fant ingen torsdag med liga de neste to årene.");
 }
 
-/** Kommende torsdager uten liga, fra i dag og framover. */
-export async function getUpcomingCancellations(now: Date = new Date()) {
-  return db
-    .select({ date: schema.cancelledDates.date, reason: schema.cancelledDates.reason })
+/**
+ * Kommende torsdager uten liga, fra i dag og framover. Spillerne ser bare de som ikke er
+ * skjult; admin ser alle med `includeHidden`.
+ */
+export async function getUpcomingCancellations({ includeHidden = false } = {}) {
+  const rows = await db
+    .select({
+      date: schema.cancelledDates.date,
+      reason: schema.cancelledDates.reason,
+      hidden: schema.cancelledDates.hidden,
+    })
     .from(schema.cancelledDates)
-    .where(gte(schema.cancelledDates.date, osloToday(now)))
+    .where(gte(schema.cancelledDates.date, osloToday()))
     .orderBy(asc(schema.cancelledDates.date));
+  return includeHidden ? rows : rows.filter((r) => !r.hidden);
 }
 
 /**

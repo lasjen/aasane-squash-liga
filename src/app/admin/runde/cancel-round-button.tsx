@@ -52,6 +52,10 @@ export function CancelRoundButton({
           className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
         />
       </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="hidden" className="size-4 accent-zinc-900 dark:accent-zinc-100" />
+        Ikke vis avlysningen for spillerne
+      </label>
       <div className="flex items-center gap-3">
         <PendingButton
           pendingText="Avlyser …"

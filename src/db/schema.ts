@@ -47,6 +47,11 @@ export const players = pgTable("players", {
   /** Gir tilgang til /admin. Settes med `npm run admin`. */
   isAdmin: boolean("is_admin").notNull().default(false),
   active: boolean("active").notNull().default(true),
+  /**
+   * Satt når admin har slettet spilleren. Personopplysningene er da fjernet og navnet
+   * er «Tidligere spiller», men raden beholdes så kamper og resultatlister henger sammen.
+   */
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
 });
 
@@ -153,6 +158,8 @@ export const cancelledDates = pgTable(
   {
     date: date("date").primaryKey(),
     reason: text("reason"),
+    /** Skjult for spillerne. Datoen hoppes likevel over når neste runde finnes. */
+    hidden: boolean("hidden").notNull().default(false),
     createdAt: timestamps.createdAt,
   },
   (t) => [check("cancelled_dates_thursday_check", sql`extract(isodow from ${t.date}) = 4`)],

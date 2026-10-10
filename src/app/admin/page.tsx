@@ -1,4 +1,4 @@
-import { asc, desc, sql } from "drizzle-orm";
+import { asc, desc, isNull, sql } from "drizzle-orm";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -7,7 +7,12 @@ import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth/admin-session";
 import { GENDER_LABELS, LEVEL_LABELS } from "@/lib/player-options";
 
-import { ActivatePlayerButton, DeactivatePlayerButton, UpdateRankingButton } from "./player-buttons";
+import {
+  ActivatePlayerButton,
+  DeactivatePlayerButton,
+  DeletePlayerButton,
+  UpdateRankingButton,
+} from "./player-buttons";
 
 export const metadata: Metadata = { title: "Admin – Torsdagsligaen" };
 
@@ -19,6 +24,11 @@ const MESSAGES: Record<string, (params: Record<string, string | string[] | undef
   aktivert: () =>
     "Spilleren er aktiv igjen. Trykk «Oppdater ranking» for å gi spilleren en plass i rankingen.",
   "ikke-deg-selv": () => "Du kan ikke sette deg selv på pause.",
+  "spiller-slettet": () =>
+    "Spilleren er slettet. Tidligere kamper og resultater vises nå som «Tidligere spiller».",
+  "i-runde": () =>
+    "Spilleren er med i en runde som pågår. Fjern spilleren fra runden under Ligarunde før du sletter.",
+  "ikke-slette-deg-selv": () => "Du kan ikke slette deg selv.",
   ranking: (params) => {
     const count = Number(params.nye) || 0;
     return count === 0
@@ -88,6 +98,8 @@ async function PlayerTable() {
       ranking: schema.players.ranking,
     })
     .from(schema.players)
+    // Slettede spillere vises ikke.
+    .where(isNull(schema.players.deletedAt))
     // Rangerte først, deretter aktive uten ranking, til slutt inaktive.
     .orderBy(
       desc(schema.players.active),
@@ -143,6 +155,7 @@ async function PlayerTable() {
                   ) : (
                     <ActivatePlayerButton playerId={p.id} />
                   )}
+                  <DeletePlayerButton playerId={p.id} name={`${p.firstName} ${p.lastName}`} />
                 </div>
               </td>
             </tr>

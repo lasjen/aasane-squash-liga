@@ -263,7 +263,7 @@ export async function addToGroup(roundId: number, groupId: number, formData: For
  * Gjør datoen til en torsdag uten liga. Finnes det en runde med åpen påmelding den dagen,
  * slettes den sammen med påmeldingene. Returnerer feilnøkkel eller antall slettede påmeldinger.
  */
-async function cancelThursday(date: string, reason: string | null) {
+async function cancelThursday(date: string, reason: string | null, hidden: boolean) {
   if (!isValidDate(date) || new Date(`${date}T00:00:00Z`).getUTCDay() !== 4) return "ikke-torsdag";
   if (date < osloToday()) return "dato-passert";
 
@@ -287,8 +287,8 @@ async function cancelThursday(date: string, reason: string | null) {
     }
     await tx
       .insert(schema.cancelledDates)
-      .values({ date, reason })
-      .onConflictDoUpdate({ target: schema.cancelledDates.date, set: { reason } });
+      .values({ date, reason, hidden })
+      .onConflictDoUpdate({ target: schema.cancelledDates.date, set: { reason, hidden } });
     return removedSignups;
   });
 }
@@ -304,6 +304,8 @@ function redirectAfterCancel(outcome: string | number): never {
 /** Melding til spillerne fra skjemaet, eller null hvis feltet er tomt. */
 const cancelMessage = (formData: FormData) =>
   String(formData.get("reason") ?? "").trim().slice(0, 300) || null;
+/** Om avlysningen skal skjules for spillerne («Ikke vis for spillerne» er krysset av). */
+const cancelHidden = (formData: FormData) => formData.get("hidden") === "on";
 
 /**
  * Avlyser torsdagen som er neste runde, så påmeldingen til torsdagen etter åpner.
@@ -311,14 +313,24 @@ const cancelMessage = (formData: FormData) =>
  */
 export async function cancelNextRound(date: string, formData: FormData) {
   await requireAdmin();
-  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData)));
+  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData), cancelHidden(formData)));
 }
 
 /** Legger inn en torsdag uten liga fra skjemaet (dato og valgfri melding). Finnes datoen, oppdateres meldingen. */
 export async function addCancelledDate(formData: FormData) {
   await requireAdmin();
   const date = String(formData.get("date") ?? "");
-  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData)));
+  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData), cancelHidden(formData)));
+}
+
+/** Endrer meldingen og om avlysningen vises for spillerne. */
+export async function updateCancelledDate(date: string, formData: FormData) {
+  await requireAdmin();
+  await db
+    .update(schema.cancelledDates)
+    .set({ reason: cancelMessage(formData), hidden: cancelHidden(formData) })
+    .where(eq(schema.cancelledDates.date, date));
+  redirect(`${PAGE}?melding=avlysning-endret`);
 }
 
 /** Åpner en avlyst torsdag igjen. */

@@ -14,6 +14,7 @@ import {
   removeCancelledDate,
   removeFromRound,
   restartRound,
+  updateCancelledDate,
   setRoundFormat,
   startRound,
 } from "@/app/actions/admin-round";
@@ -30,6 +31,7 @@ import { getRoundMatches } from "@/lib/round-matches";
 import { findAdminRound, getGroups, getSignups, getUpcomingCancellations } from "@/lib/rounds";
 
 import { CancelRoundButton } from "./cancel-round-button";
+import { CancelledDateRow } from "./cancelled-date-row";
 
 export const metadata: Metadata = { title: "Ligarunde – Admin – Torsdagsligaen" };
 
@@ -57,6 +59,7 @@ const MESSAGES: Record<string, (params: Params) => string> = {
   "dato-passert": () => "Datoen har allerede vært.",
   "runde-startet": () => "Runden den dagen er allerede startet, og kan ikke avlyses.",
   gjenapnet: () => "Avlysningen er fjernet, og datoen er åpen for liga igjen.",
+  "avlysning-endret": () => "Avlysningen er endret.",
   "format-laast": () => "Kampformatet kan ikke endres etter at det er registrert resultater.",
   "ukjent-format": () => "Velg best av 3 eller best av 5 sett.",
   antall: (params) =>
@@ -136,7 +139,7 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
 
 /** Kommende torsdager uten liga, med mulighet for å legge til og fjerne datoer. */
 async function CancelledDates() {
-  const cancellations = await getUpcomingCancellations();
+  const cancellations = await getUpcomingCancellations({ includeHidden: true });
 
   return (
     <section className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
@@ -146,15 +149,14 @@ async function CancelledDates() {
       ) : (
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {cancellations.map((c) => (
-            <li key={c.date} className="flex items-center gap-3 px-4 py-2">
-              <span className="inline-block font-medium first-letter:uppercase">{formatRoundDate(c.date)}</span>
-              <span className="flex-1 text-sm text-zinc-500">{c.reason}</span>
-              <form action={removeCancelledDate.bind(null, c.date)}>
-                <PendingButton pendingText="Fjerner …" className={linkButton}>
-                  Fjern avlysning
-                </PendingButton>
-              </form>
-            </li>
+            <CancelledDateRow
+              key={c.date}
+              dateLabel={formatRoundDate(c.date)}
+              reason={c.reason}
+              hidden={c.hidden}
+              updateAction={updateCancelledDate.bind(null, c.date)}
+              removeAction={removeCancelledDate.bind(null, c.date)}
+            />
           ))}
         </ul>
       )}
@@ -178,6 +180,10 @@ async function CancelledDates() {
             placeholder="F.eks. Høstferie"
             className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
           />
+        </label>
+        <label className="flex items-center gap-2 self-center">
+          <input type="checkbox" name="hidden" className="size-4 accent-zinc-900 dark:accent-zinc-100" />
+          Ikke vis for spillerne
         </label>
         <PendingButton pendingText="Legger til …" className={secondaryButton}>
           Legg til

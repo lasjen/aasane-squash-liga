@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
@@ -118,7 +118,7 @@ export async function updatePlayer(
           // Tomt passordfelt betyr at passordet ikke endres.
           ...(password && { passwordHash: await hashPassword(password) }),
         })
-        .where(eq(schema.players.id, playerId))
+        .where(and(eq(schema.players.id, playerId), isNull(schema.players.deletedAt)))
         .returning({ id: schema.players.id });
 
       if (!player.isAdmin || !player.active) {
@@ -158,8 +158,57 @@ export async function deactivatePlayer(playerId: number) {
 /** Tar spilleren av pause. Plass i rankingen får spilleren ved neste «Oppdater ranking». */
 export async function activatePlayer(playerId: number) {
   await requireAdmin();
-  await db.update(schema.players).set({ active: true }).where(eq(schema.players.id, playerId));
+  // Slettede spillere kan ikke aktiveres igjen.
+  await db
+    .update(schema.players)
+    .set({ active: true })
+    .where(and(eq(schema.players.id, playerId), isNull(schema.players.deletedAt)));
   redirect("/admin?melding=aktivert");
+}
+
+/**
+ * Sletter spilleren: alle personopplysninger fjernes, og navnet blir «Tidligere spiller».
+ * Raden beholdes så tidligere kamper og resultatlister henger sammen med sine resultater.
+ * Påmeldinger, innlogginger og ranking fjernes. Kan ikke angres.
+ */
+export async function deletePlayer(playerId: number) {
+  const admin = await requireAdmin();
+  if (playerId === admin.id) redirect("/admin?melding=ikke-slette-deg-selv");
+
+  const outcome = await db.transaction(async (tx) => {
+    // En spiller i en runde som pågår, må fjernes fra runden først.
+    const [inRunningRound] = await tx
+      .select({ roundId: schema.roundGroupPlayers.roundId })
+      .from(schema.roundGroupPlayers)
+      .innerJoin(schema.rounds, eq(schema.rounds.id, schema.roundGroupPlayers.roundId))
+      .where(and(eq(schema.roundGroupPlayers.playerId, playerId), eq(schema.rounds.status, "started")))
+      .limit(1);
+    if (inRunningRound) return "i-runde";
+
+    await removeFromRanking(tx, playerId);
+    await tx.delete(schema.roundSignups).where(eq(schema.roundSignups.playerId, playerId));
+    await tx.delete(schema.sessions).where(eq(schema.sessions.playerId, playerId));
+    await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
+    await tx
+      .update(schema.players)
+      .set({
+        firstName: "Tidligere",
+        lastName: "spiller",
+        email: null,
+        phone: null,
+        gender: null,
+        level: null,
+        passwordHash: null,
+        isAdmin: false,
+        active: false,
+        ranking: null,
+        deletedAt: new Date(),
+      })
+      .where(eq(schema.players.id, playerId));
+    return "spiller-slettet";
+  });
+
+  redirect(`/admin?melding=${outcome}`);
 }
 
 /**
