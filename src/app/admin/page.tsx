@@ -4,8 +4,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { db, schema } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
 import { GENDER_LABELS, LEVEL_LABELS } from "@/lib/player-options";
+import { ROLE_LABELS } from "@/lib/roles";
 
 import {
   ActivatePlayerButton,
@@ -29,6 +30,8 @@ const MESSAGES: Record<string, (params: Record<string, string | string[] | undef
   "i-runde": () =>
     "Spilleren er med i en runde som pågår. Fjern spilleren fra runden under Ligarunde før du sletter.",
   "ikke-slette-deg-selv": () => "Du kan ikke slette deg selv.",
+  "kun-admin": () => "Det kan bare en admin gjøre.",
+  "siste-admin": () => "Spilleren er den siste admin-en, og kan ikke slettes.",
   ranking: (params) => {
     const count = Number(params.nye) || 0;
     return count === 0
@@ -53,7 +56,7 @@ async function AdminPlayers({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  await requireOperator();
   const params = await searchParams;
   const key = typeof params.melding === "string" ? params.melding : undefined;
   const message = key && MESSAGES[key]?.(params);
@@ -94,7 +97,7 @@ async function PlayerTable() {
       gender: schema.players.gender,
       level: schema.players.level,
       active: schema.players.active,
-      isAdmin: schema.players.isAdmin,
+      role: schema.players.role,
       ranking: schema.players.ranking,
     })
     .from(schema.players)
@@ -134,9 +137,9 @@ async function PlayerTable() {
               <td className="px-3 py-2 text-right tabular-nums">{p.ranking ?? "–"}</td>
               <td className="px-3 py-2 whitespace-nowrap">
                 {p.firstName} {p.lastName}
-                {p.isAdmin && (
+                {p.role !== "player" && (
                   <span className="ml-2 rounded bg-zinc-900 px-1.5 py-0.5 text-xs text-white dark:bg-zinc-100 dark:text-zinc-900">
-                    admin
+                    {ROLE_LABELS[p.role].toLowerCase()}
                   </span>
                 )}
                 {!p.active && <span className="ml-2 text-xs">(på pause)</span>}

@@ -33,7 +33,8 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | Tabell             | Innhold                                                        |
 | ------------------ | -------------------------------------------------------------- |
 | `players`          | Spillere i klubben, på tvers av sesonger                       |
-| `admin_sessions`   | Innloggingsøkter for admin, adskilt fra vanlige økter          |
+| `admin_sessions`   | Innloggingsøkter i konsollen, adskilt fra vanlige økter        |
+| `audit_log`        | Logg over hva operatører og admins har gjort i konsollen       |
 | `seasons`          | Sesonger av ligaen, f.eks. «Høst 2026»                         |
 | `divisions`        | Divisjoner per sesong, nivå 1 er øverst                        |
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
@@ -109,34 +110,39 @@ Registreringen lagrer fornavn, etternavn, kjønn, mobil, e-post (brukes som
 brukernavn), passord og nivå. Valgene for kjønn og nivå ligger i
 `src/lib/player-options.ts`.
 
-### Administratorer
+### Roller: operatør og admin
 
-Administratorer er vanlige spillere med `is_admin = true`. De logger inn på
-`/admin/logg-inn` med samme e-post og passord som ellers, og havner på `/admin`.
+Hver spiller har én rolle (`players.role`):
 
-- Admin-innloggingen er en egen økt (`admin_sessions`) med egen cookie,
-  `admin_session`, som bare gjelder under `/admin` og varer i 12 timer.
-  Å være logget inn som spiller gir ikke admin-tilgang.
-- `is_admin` sjekkes ved hver forespørsel. Fjernes flagget, mister personen
-  tilgangen med en gang.
-- Gi eller fjern admin-tilgang for en registrert spiller:
+| Rolle    | Kan                                                                  |
+| -------- | -------------------------------------------------------------------- |
+| Spiller  | Spillersidene                                                        |
+| Operatør | Konsollen under `/admin`: spillere, ligarunder, resultater, avlysninger |
+| Admin    | Alt operatøren kan, pluss å endre roller og se loggen (`/admin/logg`) |
+
+- Både operatører og admins logger inn på `/admin/logg-inn` med samme e-post
+  og passord som ellers. Innloggingen er en egen økt (`admin_sessions`) med
+  egen cookie, `admin_session`, som bare gjelder under `/admin` og varer i
+  12 timer.
+- Bare admin kan endre roller, og bare admin kan endre, deaktivere eller
+  slette operatører og admins. Ingen kan fjerne sin egen rolle, og den siste
+  admin-en kan ikke miste rollen eller slettes.
+- Alt operatører og admins gjør i konsollen loggføres i `audit_log` med
+  tidspunkt, hvem og hva (`src/lib/audit.ts`). Admin ser loggen under fanen
+  «Logg» og kan filtrere per person. Øverst vises antall linjer, datamengde
+  (summen av radene) og eldste linje, og admin kan slette linjer eldre enn
+  1, 3 eller 6 måneder. Slettingen loggføres selv.
+- Gi en rolle fra kommandolinjen (f.eks. den første admin-en):
 
   ```bash
-  npm run admin -- ola@klubben.no
-  npm run admin -- ola@klubben.no --fjern
+  npm run admin -- ola@klubben.no              # admin
+  npm run admin -- ola@klubben.no --operator   # operatør
+  npm run admin -- ola@klubben.no --fjern      # vanlig spiller
   ```
 
-- På `/admin` kan admin legge til og endre spillere, og oppdatere rankingen.
-  «Deaktiver» setter spilleren på pause (inaktiv) og tar den ut av
-  rankingen. Spillerne under rykker opp én plass. «Aktiver» tar spilleren av
-  pause, og «Oppdater ranking» gir den en ny plass.
-- «Slett» fjerner spilleren for godt: navn, e-post, mobil, nivå, passord,
-  admin-tilgang, ranking, påmeldinger og innlogginger fjernes. Raden beholdes
-  med navnet «Tidligere spiller» (og `deleted_at` satt), så tidligere kamper og
-  resultatlister beholder resultatene sine. Spillere i en runde som pågår må
-  fjernes fra runden først.
-- Bruk `requireAdmin()` fra `src/lib/auth/admin-session.ts` i hver
-  admin-side og hver server action for admin. Layouten alene beskytter ikke.
+- Bruk `requireOperator()` fra `src/lib/auth/admin-session.ts` i hver side og
+  server action i konsollen, og `requireAdmin()` der bare admin skal slippe
+  til. Layouten alene beskytter ikke.
 
 ### Påmelding
 

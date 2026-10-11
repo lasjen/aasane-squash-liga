@@ -1,11 +1,12 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
 import { db, schema } from "@/db";
-import { createAdminSession, deleteAdminSession } from "@/lib/auth/admin-session";
+import { logAction } from "@/lib/audit";
+import { createAdminSession, deleteAdminSession, getCurrentOperator } from "@/lib/auth/admin-session";
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
 import { loginSchema, type FormState, type LoginField } from "@/lib/auth/validation";
 
@@ -22,14 +23,19 @@ export async function adminLogin(
   }
 
   const { email, password } = parsed.data;
-  // Bare aktive spillere med is_admin kan logge inn her.
+  // Bare aktive operatører og admins kan logge inn her.
   const [admin] = await db
-    .select({ id: schema.players.id, passwordHash: schema.players.passwordHash })
+    .select({
+      id: schema.players.id,
+      firstName: schema.players.firstName,
+      lastName: schema.players.lastName,
+      passwordHash: schema.players.passwordHash,
+    })
     .from(schema.players)
     .where(
       and(
         eq(schema.players.email, email),
-        eq(schema.players.isAdmin, true),
+        inArray(schema.players.role, ["operator", "admin"]),
         eq(schema.players.active, true),
       ),
     )
@@ -44,10 +50,13 @@ export async function adminLogin(
   }
 
   await createAdminSession(admin.id);
+  await logAction(admin, "innlogging", "Logget inn i konsollen");
   redirect("/admin");
 }
 
 export async function adminLogout() {
+  const actor = await getCurrentOperator();
+  if (actor) await logAction(actor, "utlogging", "Logget ut av konsollen");
   await deleteAdminSession();
   redirect("/admin/logg-inn");
 }

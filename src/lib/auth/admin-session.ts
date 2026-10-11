@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -49,9 +49,9 @@ export async function deleteAdminSession() {
 
 /**
  * Den innloggede administratoren, eller null. Memoisert per forespørsel.
- * is_admin sjekkes hver gang, så en som mister admin-rollen mister tilgangen med en gang.
+ * Rollen sjekkes hver gang, så en som mister operatør- eller admin-rollen mister tilgangen med en gang.
  */
-export const getCurrentAdmin = cache(async () => {
+export const getCurrentOperator = cache(async () => {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token) return null;
 
@@ -61,6 +61,7 @@ export const getCurrentAdmin = cache(async () => {
       firstName: schema.players.firstName,
       lastName: schema.players.lastName,
       email: schema.players.email,
+      role: schema.players.role,
     })
     .from(schema.adminSessions)
     .innerJoin(schema.players, eq(schema.players.id, schema.adminSessions.playerId))
@@ -68,7 +69,7 @@ export const getCurrentAdmin = cache(async () => {
       and(
         eq(schema.adminSessions.id, hashToken(token)),
         gt(schema.adminSessions.expiresAt, sql`now()`),
-        eq(schema.players.isAdmin, true),
+        inArray(schema.players.role, ["operator", "admin"]),
         eq(schema.players.active, true),
       ),
     )
@@ -78,17 +79,27 @@ export const getCurrentAdmin = cache(async () => {
 });
 
 /**
- * Som getCurrentAdmin, men sender til admin-innlogging hvis ingen er logget inn.
+ * Som getCurrentOperator, men sender til admin-innlogging hvis ingen er logget inn.
  * Kall den i hver admin-side og hver admin-action. Layouten alene beskytter ikke.
  */
-export async function requireAdmin() {
-  const admin = await getCurrentAdmin();
+export async function requireOperator() {
+  const admin = await getCurrentOperator();
   if (!admin) redirect("/admin/logg-inn");
   return admin;
 }
 
 /** Sender innloggede administratorer videre fra /admin/logg-inn. Rendres inni <Suspense>. */
-export async function RedirectIfAdmin({ to = "/admin" }: { to?: string }) {
-  if (await getCurrentAdmin()) redirect(to);
+export async function RedirectIfOperator({ to = "/admin" }: { to?: string }) {
+  if (await getCurrentOperator()) redirect(to);
   return null;
+}
+
+/**
+ * Som requireOperator, men krever admin-rollen: endre roller og se loggen.
+ * Operatører uten admin-rollen sendes til forsiden av konsollen.
+ */
+export async function requireAdmin() {
+  const operator = await requireOperator();
+  if (operator.role !== "admin") redirect("/admin?melding=kun-admin");
+  return operator;
 }

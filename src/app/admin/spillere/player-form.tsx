@@ -7,11 +7,13 @@ import { Checkbox, Field, FormMessage, RadioGroup, SubmitButton } from "@/compon
 import type { AdminPlayerField } from "@/lib/admin/player-validation";
 import type { FormState } from "@/lib/auth/validation";
 import { GENDER_LABELS, GENDERS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
+import { ROLE_HINTS, ROLE_LABELS, ROLES } from "@/lib/roles";
 
 type PlayerFormState = FormState<AdminPlayerField>;
 
 const notSet = { value: "", label: "Ikke oppgitt" };
 const genderOptions = [...GENDERS.map((g) => ({ value: g, label: GENDER_LABELS[g] })), notSet];
+const roleOptions = ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], hint: ROLE_HINTS[r] }));
 const levelOptions = [...LEVELS.map((l) => ({ value: l, label: LEVEL_LABELS[l] })), notSet];
 
 export type PlayerFormDefaults = Partial<Record<AdminPlayerField, string>>;
@@ -21,12 +23,15 @@ export function PlayerForm({
   defaults,
   submitLabel,
   isNew,
+  canEditRole,
 }: {
   action: (prev: PlayerFormState, formData: FormData) => Promise<PlayerFormState>;
   /** Verdiene skjemaet starter med. Avkrysningsbokser bruker "on" for avkrysset. */
   defaults: PlayerFormDefaults;
   submitLabel: string;
   isNew: boolean;
+  /** Bare admin kan endre roller. */
+  canEditRole: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const errors = state?.errors;
@@ -102,13 +107,17 @@ export function PlayerForm({
           defaultChecked={values.active === "on"}
           hint="Inaktive spillere er ikke med i rankingen."
         />
-        <Checkbox
-          label="Admin"
-          name="isAdmin"
-          defaultChecked={values.isAdmin === "on"}
-          hint="Kan logge inn på /admin/logg-inn."
-        />
       </div>
+      {canEditRole && (
+        <RadioGroup
+          legend="Rolle"
+          name="role"
+          layout="column"
+          options={roleOptions}
+          defaultValue={values.role || "player"}
+          errors={errors?.role}
+        />
+      )}
       <div className="flex items-center gap-4">
         <SubmitButton pending={pending}>{submitLabel}</SubmitButton>
         <Link href="/admin" className="text-sm font-medium underline">

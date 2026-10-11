@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { createPlayer } from "@/app/actions/admin-players";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
 
 import { PlayerForm } from "../player-form";
 
@@ -20,8 +20,14 @@ export default function NewPlayerPage() {
 }
 
 async function NewPlayerForm() {
-  await requireAdmin();
+  const actor = await requireOperator();
   return (
-    <PlayerForm action={createPlayer} defaults={{ active: "on" }} submitLabel="Legg til spiller" isNew />
+    <PlayerForm
+      action={createPlayer}
+      defaults={{ active: "on", role: "player" }}
+      submitLabel="Legg til spiller"
+      isNew
+      canEditRole={actor.role === "admin"}
+    />
   );
 }

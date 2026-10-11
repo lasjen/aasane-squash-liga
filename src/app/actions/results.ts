@@ -2,8 +2,11 @@
 
 import { refresh } from "next/cache";
 
-import { db } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { eq } from "drizzle-orm";
+
+import { db, schema } from "@/db";
+import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
+import { requireOperator } from "@/lib/auth/admin-session";
 import { requirePlayer } from "@/lib/auth/session";
 import { confirmResult, lockMatch, saveResult } from "@/lib/match-results";
 import { finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
@@ -72,7 +75,7 @@ export async function adminSaveResult(
   _prev: ResultState,
   formData: FormData,
 ): Promise<ResultState> {
-  const admin = await requireAdmin();
+  const admin = await requireOperator();
   const error = await db.transaction(async (tx) => {
     const match = await lockMatch(tx, matchId);
     if (!match || match.roundStatus !== "started") return "Runden er ikke i gang lenger.";
@@ -93,6 +96,7 @@ export async function adminSaveResult(
   });
   if (error) return { error };
 
+  await logResult(admin, matchId, "resultat.registrert", "Registrerte resultat");
   refresh();
   return { saved: true };
 }
@@ -106,7 +110,7 @@ export async function adminCorrectResult(
   _prev: ResultState,
   formData: FormData,
 ): Promise<ResultState> {
-  const admin = await requireAdmin();
+  const admin = await requireOperator();
   const error = await db.transaction(async (tx) => {
     const match = await lockMatch(tx, matchId);
     if (!match) return "Fant ikke kampen.";
@@ -130,6 +134,28 @@ export async function adminCorrectResult(
   });
   if (error) return { error };
 
+  await logResult(admin, matchId, "resultat.rettet", "Rettet resultat i avsluttet runde (ny resultatliste og ranking)");
   refresh();
   return { saved: true };
+}
+
+/** Logger et resultat admin har lagret, med spillere, resultat og rundedato. */
+async function logResult(actor: Actor, matchId: number, action: string, verb: string) {
+  const [m] = await db
+    .select({
+      roundId: schema.matches.roundId,
+      player1Id: schema.matches.player1Id,
+      player2Id: schema.matches.player2Id,
+      player1Games: schema.matches.player1Games,
+      player2Games: schema.matches.player2Games,
+    })
+    .from(schema.matches)
+    .where(eq(schema.matches.id, matchId));
+  if (!m) return;
+  const [p1, p2, round] = await Promise.all([
+    m.player1Id ? playerLabel(m.player1Id) : "?",
+    m.player2Id ? playerLabel(m.player2Id) : "?",
+    roundLabel(m.roundId),
+  ]);
+  await logAction(actor, action, `${verb}: ${p1} – ${p2} ${m.player1Games}–${m.player2Games} (${round})`);
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { FinishedRoundList } from "@/components/round-results";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
 
 export const metadata: Metadata = { title: "Resultater – Admin – Torsdagsligaen" };
 
@@ -18,6 +18,6 @@ export default function AdminResultsPage() {
 }
 
 async function Rounds() {
-  await requireAdmin();
+  await requireOperator();
   return <FinishedRoundList basePath="/admin/resultater" />;
 }

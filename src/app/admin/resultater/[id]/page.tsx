@@ -7,7 +7,7 @@ import { recomputeRoundResults } from "@/app/actions/admin-round";
 import { ConfirmButton } from "@/components/confirm-button";
 import { RoundResults } from "@/components/round-results";
 import { db } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
 import { finishedRoundEditProblem } from "@/lib/round-results";
 
 export const metadata: Metadata = { title: "Resultater – Admin – Torsdagsligaen" };
@@ -42,7 +42,7 @@ async function Results({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  await requireOperator();
   const id = Number((await params).id);
   if (!Number.isSafeInteger(id) || id < 1) notFound();
   const key = (await searchParams).melding;

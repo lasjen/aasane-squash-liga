@@ -1,6 +1,7 @@
 import * as z from "zod";
 
 import { GENDERS, LEVELS } from "@/lib/player-options";
+import { ROLES } from "@/lib/roles";
 
 /**
  * Tomt felt blir null, ellers valideres verdien med schemaet.
@@ -49,7 +50,8 @@ export const adminPlayerSchema = z.object({
       .max(128, { error: "Passordet kan ha maks 128 tegn." }),
   ),
   active: z.boolean(),
-  isAdmin: z.boolean(),
+  /** Bare med når en admin lagrer skjemaet. Mangler den, endres ikke rollen. */
+  role: z.enum(ROLES, { error: "Velg en gyldig rolle." }).optional(),
 });
 
 export type AdminPlayerField = keyof z.input<typeof adminPlayerSchema>;

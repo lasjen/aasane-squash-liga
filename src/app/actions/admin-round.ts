@@ -4,8 +4,9 @@ import { and, asc, count, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db, schema } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
-import { osloToday } from "@/lib/dates";
+import { requireOperator } from "@/lib/auth/admin-session";
+import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
+import { formatRoundDate, osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem, splitIntoGroups } from "@/lib/groups";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
@@ -89,7 +90,7 @@ function redirectWithBadCount(count: number): never {
 }
 
 export async function startRound(roundId: number) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   const problem = await db.transaction(async (tx) => {
     if ((await lockRound(tx, roundId)) !== "open") return "status" as const;
@@ -101,11 +102,12 @@ export async function startRound(roundId: number) {
 
   if (problem === "status") redirect(`${PAGE}?melding=feil-status`);
   if (problem !== null) redirectWithBadCount(problem);
+  await logAction(actor, "runde.startet", `Startet runden ${await roundLabel(roundId)}`);
   redirect(`${PAGE}?melding=startet`);
 }
 
 export async function restartRound(roundId: number) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   const problem = await db.transaction(async (tx) => {
     if ((await lockRound(tx, roundId)) !== "started") return "status" as const;
@@ -114,12 +116,17 @@ export async function restartRound(roundId: number) {
 
   if (problem === "status") redirect(`${PAGE}?melding=feil-status`);
   if (problem !== null) redirectWithBadCount(problem);
+  await logAction(
+    actor,
+    "runde.restartet",
+    `Restartet runden ${await roundLabel(roundId)} (grupper og kamper satt opp på nytt)`,
+  );
   redirect(`${PAGE}?melding=restartet`);
 }
 
 /** Avslutter runden: lager resultatlisten og oppdaterer rankingen. Krever resultat i alle kamper. */
 export async function finishRound(roundId: number) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   const outcome = await db.transaction(async (tx) => {
     if ((await lockRound(tx, roundId)) !== "started") return "feil-status";
@@ -129,6 +136,9 @@ export async function finishRound(roundId: number) {
     return "avsluttet";
   });
 
+  if (outcome === "avsluttet") {
+    await logAction(actor, "runde.avsluttet", `Avsluttet runden ${await roundLabel(roundId)}`);
+  }
   redirect(
     outcome === "avsluttet" ? `/admin/resultater/${roundId}?melding=avsluttet` : `${PAGE}?melding=${outcome}`,
   );
@@ -136,7 +146,7 @@ export async function finishRound(roundId: number) {
 
 /** Regner ut resultatlisten og rankingen for en avsluttet runde på nytt. */
 export async function recomputeRoundResults(roundId: number) {
-  await requireAdmin();
+  const actor = await requireOperator();
   const page = `/admin/resultater/${roundId}`;
 
   const ok = await db.transaction(async (tx) => {
@@ -146,6 +156,13 @@ export async function recomputeRoundResults(roundId: number) {
     return true;
   });
 
+  if (ok) {
+    await logAction(
+      actor,
+      "runde.beregnet",
+      `Beregnet resultatliste og ranking på nytt for ${await roundLabel(roundId)}`,
+    );
+  }
   redirect(`${page}?melding=${ok ? "beregnet" : "kan-ikke-endres"}`);
 }
 
@@ -154,7 +171,7 @@ export async function recomputeRoundResults(roundId: number) {
  * Kan ikke endres etter at et resultat er registrert, siden resultatene da ville blitt ugyldige.
  */
 export async function setRoundFormat(date: string, formData: FormData) {
-  await requireAdmin();
+  const actor = await requireOperator();
   const bestOf = Number(formData.get("bestOf"));
   if (!BEST_OF_OPTIONS.includes(bestOf as BestOf)) redirect(`${PAGE}?melding=ukjent-format`);
 
@@ -171,12 +188,15 @@ export async function setRoundFormat(date: string, formData: FormData) {
     return "format";
   });
 
+  if (outcome === "format") {
+    await logAction(actor, "runde.format", `Satte kampformat best av ${bestOf} sett for ${formatRoundDate(date)}`);
+  }
   redirect(`${PAGE}?melding=${outcome}`);
 }
 
 /** Legger en spiller til neste runde før den er startet. Er runden full, havner spilleren på venteliste. */
 export async function addToRound(date: string, playerId: number) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   const ok = await db.transaction(async (tx) => {
     const round = await ensureRound(tx, date);
@@ -185,6 +205,13 @@ export async function addToRound(date: string, playerId: number) {
     return true;
   });
 
+  if (ok) {
+    await logAction(
+      actor,
+      "runde.spiller-lagt-til",
+      `La ${await playerLabel(playerId)} til runden ${formatRoundDate(date)}`,
+    );
+  }
   redirect(`${PAGE}?melding=${ok ? "lagt-til" : "feil-status"}`);
 }
 
@@ -193,7 +220,7 @@ export async function addToRound(date: string, playerId: number) {
  * at runden er startet. Neste på ventelisten rykker da opp i påmeldingslisten.
  */
 export async function removeFromRound(roundId: number, playerId: number, fromEdit: boolean) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   await db.transaction(async (tx) => {
     const removed = await tx
@@ -209,12 +236,17 @@ export async function removeFromRound(roundId: number, playerId: number, fromEdi
     await regenerate(tx, roundId, removed.map((r) => r.groupId));
   });
 
+  await logAction(
+    actor,
+    "runde.spiller-fjernet",
+    `Fjernet ${await playerLabel(playerId)} fra runden ${await roundLabel(roundId)}`,
+  );
   redirect(fromEdit ? `${EDIT_PAGE}&melding=fjernet` : `${PAGE}?melding=fjernet`);
 }
 
 /** Flytter en spiller til gruppen som er valgt i skjemaet. */
 export async function movePlayer(roundId: number, playerId: number, formData: FormData) {
-  await requireAdmin();
+  const actor = await requireOperator();
   const groupNumber = Number(formData.get("group"));
 
   const moved = await db.transaction(async (tx) => {
@@ -234,12 +266,19 @@ export async function movePlayer(roundId: number, playerId: number, formData: Fo
     return true;
   });
 
+  if (moved) {
+    await logAction(
+      actor,
+      "runde.spiller-flyttet",
+      `Flyttet ${await playerLabel(playerId)} til gruppe ${groupNumber} (${await roundLabel(roundId)})`,
+    );
+  }
   redirect(`${EDIT_PAGE}&melding=${moved ? "flyttet" : "ukjent-gruppe"}`);
 }
 
 /** Legger spilleren som er valgt i skjemaet til en gruppe, og melder spilleren på runden. */
 export async function addToGroup(roundId: number, groupId: number, formData: FormData) {
-  await requireAdmin();
+  const actor = await requireOperator();
   const playerId = Number(formData.get("playerId"));
   if (!Number.isSafeInteger(playerId) || playerId < 1) redirect(`${EDIT_PAGE}&melding=velg-spiller`);
 
@@ -256,6 +295,15 @@ export async function addToGroup(roundId: number, groupId: number, formData: For
     await regenerate(tx, roundId, [oldGroupId, groupId]);
   });
 
+  const [group] = await db
+    .select({ number: schema.roundGroups.number })
+    .from(schema.roundGroups)
+    .where(eq(schema.roundGroups.id, groupId));
+  await logAction(
+    actor,
+    "runde.spiller-lagt-i-gruppe",
+    `La ${await playerLabel(playerId)} til i gruppe ${group?.number ?? "?"} (${await roundLabel(roundId)})`,
+  );
   redirect(`${EDIT_PAGE}&melding=lagt-til`);
 }
 
@@ -296,6 +344,19 @@ async function cancelThursday(date: string, reason: string | null, hidden: boole
 const isValidDate = (date: string) =>
   /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().startsWith(date);
 
+/** Logger en avlysning hvis den gikk gjennom (`outcome` er da antall slettede påmeldinger). */
+async function logCancel(actor: Actor, date: string, formData: FormData, outcome: string | number) {
+  if (typeof outcome !== "number") return;
+  const reason = cancelMessage(formData);
+  await logAction(
+    actor,
+    "avlysning.lagt-til",
+    `Avlyste ${formatRoundDate(date)}${reason ? `: «${reason}»` : ""}${
+      cancelHidden(formData) ? " (skjult for spillerne)" : ""
+    }${outcome > 0 ? `, ${outcome} påmeldinger slettet` : ""}`,
+  );
+}
+
 function redirectAfterCancel(outcome: string | number): never {
   if (typeof outcome === "string") redirect(`${PAGE}?melding=${outcome}`);
   redirect(`${PAGE}?melding=avlyst&slettet=${outcome}`);
@@ -312,30 +373,40 @@ const cancelHidden = (formData: FormData) => formData.get("hidden") === "on";
  * Meldingen vises for spillerne på påmeldingssiden.
  */
 export async function cancelNextRound(date: string, formData: FormData) {
-  await requireAdmin();
-  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData), cancelHidden(formData)));
+  const actor = await requireOperator();
+  const outcome = await cancelThursday(date, cancelMessage(formData), cancelHidden(formData));
+  await logCancel(actor, date, formData, outcome);
+  redirectAfterCancel(outcome);
 }
 
 /** Legger inn en torsdag uten liga fra skjemaet (dato og valgfri melding). Finnes datoen, oppdateres meldingen. */
 export async function addCancelledDate(formData: FormData) {
-  await requireAdmin();
+  const actor = await requireOperator();
   const date = String(formData.get("date") ?? "");
-  redirectAfterCancel(await cancelThursday(date, cancelMessage(formData), cancelHidden(formData)));
+  const outcome = await cancelThursday(date, cancelMessage(formData), cancelHidden(formData));
+  await logCancel(actor, date, formData, outcome);
+  redirectAfterCancel(outcome);
 }
 
 /** Endrer meldingen og om avlysningen vises for spillerne. */
 export async function updateCancelledDate(date: string, formData: FormData) {
-  await requireAdmin();
+  const actor = await requireOperator();
   await db
     .update(schema.cancelledDates)
     .set({ reason: cancelMessage(formData), hidden: cancelHidden(formData) })
     .where(eq(schema.cancelledDates.date, date));
+  await logAction(
+    actor,
+    "avlysning.endret",
+    `Endret avlysningen ${formatRoundDate(date)}${cancelHidden(formData) ? " (skjult for spillerne)" : ""}`,
+  );
   redirect(`${PAGE}?melding=avlysning-endret`);
 }
 
 /** Åpner en avlyst torsdag igjen. */
 export async function removeCancelledDate(date: string) {
-  await requireAdmin();
+  const actor = await requireOperator();
   await db.delete(schema.cancelledDates).where(eq(schema.cancelledDates.date, date));
+  await logAction(actor, "avlysning.fjernet", `Fjernet avlysningen ${formatRoundDate(date)}`);
   redirect(`${PAGE}?melding=gjenapnet`);
 }

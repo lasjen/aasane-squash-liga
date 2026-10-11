@@ -29,6 +29,12 @@ const timestamps = {
 export const playerGender = pgEnum("player_gender", GENDERS);
 export const playerLevel = pgEnum("player_level", LEVELS);
 
+/**
+ * Roller: spiller, operatør (driver konsollen under /admin: spillere, ligarunder, resultater)
+ * og admin (alt operatøren kan, pluss å endre roller og se loggen over operatørenes handlinger).
+ */
+export const playerRole = pgEnum("player_role", ["player", "operator", "admin"]);
+
 /** Spillere i klubben. Beholdes på tvers av sesonger. */
 export const players = pgTable("players", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -44,8 +50,8 @@ export const players = pgTable("players", {
   ranking: integer("ranking"),
   /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
   passwordHash: text("password_hash"),
-  /** Gir tilgang til /admin. Settes med `npm run admin`. */
-  isAdmin: boolean("is_admin").notNull().default(false),
+  /** Se playerRole. Bare admin kan endre roller. */
+  role: playerRole("role").notNull().default("player"),
   active: boolean("active").notNull().default(true),
   /**
    * Satt når admin har slettet spilleren. Personopplysningene er da fjernet og navnet
@@ -54,6 +60,25 @@ export const players = pgTable("players", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
 });
+
+/**
+ * Logg over hva operatører og admins har gjort i konsollen, så feil bruk kan spores.
+ * Navnet lagres også som tekst, så loggen er lesbar selv om spilleren slettes senere.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    createdAt: timestamps.createdAt,
+    actorId: integer("actor_id").references(() => players.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull(),
+    /** Kort nøkkel for hva som ble gjort, f.eks. "runde.startet". */
+    action: text("action").notNull(),
+    /** Beskrivelse for mennesker, f.eks. «Startet runde 22. oktober med 12 spillere». */
+    description: text("description").notNull(),
+  },
+  (t) => [index("audit_log_created_idx").on(t.createdAt), index("audit_log_actor_idx").on(t.actorId)],
+);
 
 /**
  * Innloggingsøkter. Id-en er en SHA-256-hash av tokenet i cookien,
@@ -74,7 +99,7 @@ export const sessions = pgTable(
 
 /**
  * Admin-økter. Adskilt fra `sessions` med egen cookie, så en vanlig
- * spillerinnlogging aldri gir admin-tilgang, selv for spillere med is_admin.
+ * spillerinnlogging aldri gir tilgang til konsollen, selv for operatører og admins.
  */
 export const adminSessions = pgTable(
   "admin_sessions",

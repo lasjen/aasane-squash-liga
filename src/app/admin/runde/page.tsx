@@ -23,7 +23,7 @@ import { AdminMatch } from "@/components/admin-match";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
 import { formatRoundDate, osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem } from "@/lib/groups";
 import { BEST_OF_OPTIONS, DEFAULT_BEST_OF } from "@/lib/score";
@@ -86,7 +86,7 @@ export default function AdminRoundPage({ searchParams }: PageProps<"/admin/runde
 }
 
 async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
-  await requireAdmin();
+  await requireOperator();
   const params = await searchParams;
   const { date, round } = await findAdminRound();
 

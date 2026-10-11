@@ -5,7 +5,8 @@ import { Suspense } from "react";
 
 import { updatePlayer } from "@/app/actions/admin-players";
 import { db, schema } from "@/db";
-import { requireAdmin } from "@/lib/auth/admin-session";
+import { requireOperator } from "@/lib/auth/admin-session";
+import { isOperatorRole, ROLE_LABELS } from "@/lib/roles";
 
 import { PlayerForm } from "../../player-form";
 
@@ -23,7 +24,7 @@ export default function EditPlayerPage({ params }: PageProps<"/admin/spillere/[i
 }
 
 async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin();
+  const actor = await requireOperator();
 
   const id = Number((await params).id);
   if (!Number.isSafeInteger(id) || id < 1) notFound();
@@ -36,6 +37,16 @@ async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
   // Slettede spillere kan ikke redigeres.
   if (!player || player.deletedAt) notFound();
 
+  // Operatører kan ikke endre operatører og admins (samme regel som i updatePlayer).
+  if (actor.role !== "admin" && isOperatorRole(player.role)) {
+    return (
+      <p className="text-zinc-600 dark:text-zinc-400">
+        {player.firstName} {player.lastName} er {ROLE_LABELS[player.role].toLowerCase()}. Bare admin
+        kan endre operatører og admins.
+      </p>
+    );
+  }
+
   return (
     <PlayerForm
       action={updatePlayer.bind(null, player.id)}
@@ -47,10 +58,11 @@ async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
         email: player.email ?? "",
         phone: player.phone ?? "",
         active: player.active ? "on" : "",
-        isAdmin: player.isAdmin ? "on" : "",
+        role: player.role,
       }}
       submitLabel="Lagre endringer"
       isNew={false}
+      canEditRole={actor.role === "admin"}
     />
   );
 }

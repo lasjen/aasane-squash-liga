@@ -36,17 +36,17 @@ export async function isInRunningRound(tx: Transaction, playerId: number) {
 /** Om spilleren er den eneste admin-en som er igjen. Den siste admin-en kan ikke slettes. */
 export async function isLastAdmin(tx: Transaction, playerId: number) {
   const [player] = await tx
-    .select({ isAdmin: schema.players.isAdmin })
+    .select({ role: schema.players.role })
     .from(schema.players)
     .where(eq(schema.players.id, playerId));
-  if (!player?.isAdmin) return false;
+  if (player?.role !== "admin") return false;
 
   const [other] = await tx
     .select({ id: schema.players.id })
     .from(schema.players)
     .where(
       and(
-        eq(schema.players.isAdmin, true),
+        eq(schema.players.role, "admin"),
         eq(schema.players.active, true),
         isNull(schema.players.deletedAt),
         ne(schema.players.id, playerId),
@@ -79,7 +79,7 @@ export async function anonymizePlayer(tx: Transaction, playerId: number) {
       gender: null,
       level: null,
       passwordHash: null,
-      isAdmin: false,
+      role: "player",
       active: false,
       ranking: null,
       deletedAt: new Date(),

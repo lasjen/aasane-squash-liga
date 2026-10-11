@@ -1,10 +1,12 @@
 /**
- * Gir eller fjerner admin-tilgang for en registrert spiller.
+ * Gir en registrert spiller en rolle fra kommandolinjen. Brukes til å lage den første
+ * admin-en; deretter kan admins endre roller i konsollen.
  *
- *   npm run admin -- ola@klubben.no           gir admin-tilgang
- *   npm run admin -- ola@klubben.no --fjern   fjerner admin-tilgang og logger ut av /admin
+ *   npm run admin -- ola@klubben.no              gir admin-rollen
+ *   npm run admin -- ola@klubben.no --operator   gir operatør-rollen
+ *   npm run admin -- ola@klubben.no --fjern      gjør spilleren til vanlig spiller igjen
  *
- * Spilleren logger inn på /admin/logg-inn med samme e-post og passord som ellers.
+ * Operatører og admins logger inn på /admin/logg-inn med samme e-post og passord som ellers.
  */
 import { loadEnvConfig } from "@next/env";
 import { eq } from "drizzle-orm";
@@ -16,11 +18,13 @@ import * as schema from "../src/db/schema";
 loadEnvConfig(process.cwd());
 
 const args = process.argv.slice(2);
-const remove = args.includes("--fjern");
+const role = args.includes("--fjern") ? "player" : args.includes("--operator") ? "operator" : "admin";
 const email = args.find((a) => !a.startsWith("--"))?.trim().toLowerCase();
 
+const ROLE_TEXT = { player: "vanlig spiller", operator: "operatør", admin: "admin" } as const;
+
 if (!email) {
-  console.error("Bruk: npm run admin -- <e-post> [--fjern]");
+  console.error("Bruk: npm run admin -- <e-post> [--operator | --fjern]");
   process.exit(1);
 }
 
@@ -38,7 +42,7 @@ async function main(databaseUrl: string, email: string) {
     await db.transaction(async (tx) => {
       const [player] = await tx
         .update(schema.players)
-        .set({ isAdmin: !remove })
+        .set({ role })
         .where(eq(schema.players.email, email))
         .returning({
           id: schema.players.id,
@@ -54,11 +58,11 @@ async function main(databaseUrl: string, email: string) {
       }
 
       const name = `${player.firstName} ${player.lastName}`;
-      if (remove) {
+      if (role === "player") {
         await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, player.id));
-        console.log(`${name} (${email}) er ikke lenger admin, og er logget ut av /admin.`);
+        console.log(`${name} (${email}) er nå ${ROLE_TEXT[role]}, og er logget ut av konsollen.`);
       } else {
-        console.log(`${name} (${email}) er nå admin og kan logge inn på /admin/logg-inn.`);
+        console.log(`${name} (${email}) er nå ${ROLE_TEXT[role]} og kan logge inn på /admin/logg-inn.`);
         if (!player.hasPassword) {
           console.log("Merk: spilleren har ikke passord ennå, så innlogging virker ikke før det er satt.");
         }
@@ -70,6 +74,6 @@ async function main(databaseUrl: string, email: string) {
 }
 
 main(url, email).catch((err) => {
-  console.error("Kunne ikke endre admin-tilgang:", err);
+  console.error("Kunne ikke endre rollen:", err);
   process.exitCode = 1;
 });

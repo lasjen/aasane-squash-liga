@@ -127,6 +127,20 @@
       "when": 1791669850839,
       "tag": "0017_skjult-avlysning-og-slettet-spiller",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791736557841,
+      "tag": "0018_roller-og-logg",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791736585113,
+      "tag": "0019_fjern-is-admin",
+      "breakpoints": true
     }
   ]
 }
