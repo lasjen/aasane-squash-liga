@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import * as z from "zod";
 
@@ -9,32 +9,16 @@ import { adminPlayerSchema, type AdminPlayerField } from "@/lib/admin/player-val
 import { requireAdmin } from "@/lib/auth/admin-session";
 import { hashPassword } from "@/lib/auth/password";
 import type { FormState } from "@/lib/auth/validation";
+import { anonymizePlayer, isInRunningRound, removeFromRanking } from "@/lib/players/delete-player";
 import { buildRanking } from "@/lib/ranking";
 
 type PlayerFormState = FormState<AdminPlayerField>;
-type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
 
 function isUniqueViolation(err: unknown) {
   const cause = err instanceof Error && "cause" in err ? err.cause : err;
   return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "23505";
-}
-
-/** Tar spilleren ut av rankingen og lar alle under rykke opp én plass, så det ikke blir hull. */
-async function removeFromRanking(tx: Transaction, playerId: number) {
-  const [player] = await tx
-    .select({ ranking: schema.players.ranking })
-    .from(schema.players)
-    .where(eq(schema.players.id, playerId))
-    .for("update");
-  if (player?.ranking == null) return;
-
-  await tx.update(schema.players).set({ ranking: null }).where(eq(schema.players.id, playerId));
-  await tx
-    .update(schema.players)
-    .set({ ranking: sql`${schema.players.ranking} - 1` })
-    .where(gt(schema.players.ranking, player.ranking));
 }
 
 /** Leser skjemaet. Returnerer enten gyldige data eller feil klare for skjemaet. */
@@ -177,34 +161,8 @@ export async function deletePlayer(playerId: number) {
 
   const outcome = await db.transaction(async (tx) => {
     // En spiller i en runde som pågår, må fjernes fra runden først.
-    const [inRunningRound] = await tx
-      .select({ roundId: schema.roundGroupPlayers.roundId })
-      .from(schema.roundGroupPlayers)
-      .innerJoin(schema.rounds, eq(schema.rounds.id, schema.roundGroupPlayers.roundId))
-      .where(and(eq(schema.roundGroupPlayers.playerId, playerId), eq(schema.rounds.status, "started")))
-      .limit(1);
-    if (inRunningRound) return "i-runde";
-
-    await removeFromRanking(tx, playerId);
-    await tx.delete(schema.roundSignups).where(eq(schema.roundSignups.playerId, playerId));
-    await tx.delete(schema.sessions).where(eq(schema.sessions.playerId, playerId));
-    await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
-    await tx
-      .update(schema.players)
-      .set({
-        firstName: "Tidligere",
-        lastName: "spiller",
-        email: null,
-        phone: null,
-        gender: null,
-        level: null,
-        passwordHash: null,
-        isAdmin: false,
-        active: false,
-        ranking: null,
-        deletedAt: new Date(),
-      })
-      .where(eq(schema.players.id, playerId));
+    if (await isInRunningRound(tx, playerId)) return "i-runde";
+    await anonymizePlayer(tx, playerId);
     return "spiller-slettet";
   });
 

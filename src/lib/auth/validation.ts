@@ -56,6 +56,10 @@ export const changePasswordSchema = z
   })
   .refine(passwordsMatch, passwordsMismatch);
 
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, { error: "Skriv inn passordet ditt for å bekrefte." }),
+});
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, { error: "Skriv inn passordet ditt." }),
@@ -82,3 +86,4 @@ export type RegisterField =
 export type LoginField = "email" | "password";
 export type ProfileField = keyof typeof profileFields;
 export type ChangePasswordField = "currentPassword" | "password" | "confirmPassword";
+export type DeleteAccountField = "password";

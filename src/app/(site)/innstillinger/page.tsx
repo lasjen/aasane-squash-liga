@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
 
-import { PasswordForm, ProfileForm } from "./settings-forms";
+import { DeleteAccountForm, PasswordForm, ProfileForm } from "./settings-forms";
 
 export const metadata: Metadata = { title: "Innstillinger – Torsdagsligaen" };
 
@@ -51,6 +51,13 @@ async function Settings() {
       <section className="flex flex-col gap-4 border-t border-zinc-200 pt-8 dark:border-zinc-800">
         <h2 className="text-xl font-semibold tracking-tight">Bytt passord</h2>
         <PasswordForm />
+      </section>
+      <section className="flex flex-col gap-4 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+        <h2 className="text-xl font-semibold tracking-tight">Slett konto</h2>
+        <p className="text-zinc-600 dark:text-zinc-400">
+          Vil du ikke lenger være med i ligaen, kan du slette kontoen og personopplysningene dine.
+        </p>
+        <DeleteAccountForm />
       </section>
     </>
   );
