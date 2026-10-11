@@ -4,6 +4,7 @@ import { useActionState } from "react";
 
 import { register } from "@/app/actions/auth";
 import { Field, FormMessage, RadioGroup, SubmitButton } from "@/components/form";
+import { ProSelect } from "@/components/pro-select";
 import { GENDER_LABELS, GENDERS, LEVEL_HINTS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 
 const genderOptions = GENDERS.map((g) => ({ value: g, label: GENDER_LABELS[g] }));
@@ -72,6 +73,7 @@ export function RegisterForm() {
         defaultValue={values?.level}
         errors={errors?.level}
       />
+      <ProSelect defaultLevel={values?.level} defaultRankedinId={values?.rankedinId} />
       <Field
         label="Passord"
         name="password"

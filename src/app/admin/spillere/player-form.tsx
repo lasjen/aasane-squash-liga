@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { Checkbox, Field, FormMessage, RadioGroup, SubmitButton } from "@/components/form";
+import { ProSelect } from "@/components/pro-select";
 import type { AdminPlayerField } from "@/lib/admin/player-validation";
 import type { FormState } from "@/lib/auth/validation";
 import { GENDER_LABELS, GENDERS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
@@ -83,6 +84,7 @@ export function PlayerForm({
         errors={errors?.level}
         required={false}
       />
+      <ProSelect admin defaultLevel={values.level ?? ""} defaultRankedinId={values.rankedinId ?? ""} />
       <Field
         label={isNew ? "Passord" : "Nytt passord"}
         name="password"

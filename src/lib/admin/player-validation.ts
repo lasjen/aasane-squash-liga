@@ -52,4 +52,4 @@ export const adminPlayerSchema = z.object({
   isAdmin: z.boolean(),
 });
 
-export type AdminPlayerField = keyof z.input<typeof adminPlayerSchema>;
+export type AdminPlayerField = keyof z.input<typeof adminPlayerSchema> | "rankedinId";

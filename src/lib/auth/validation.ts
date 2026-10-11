@@ -82,8 +82,9 @@ export type RegisterField =
   | "email"
   | "phone"
   | "password"
-  | "confirmPassword";
+  | "confirmPassword"
+  | "rankedinId";
 export type LoginField = "email" | "password";
-export type ProfileField = keyof typeof profileFields;
+export type ProfileField = keyof typeof profileFields | "rankedinId";
 export type ChangePasswordField = "currentPassword" | "password" | "confirmPassword";
 export type DeleteAccountField = "password";

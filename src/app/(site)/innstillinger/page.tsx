@@ -29,6 +29,7 @@ async function Settings() {
       level: schema.players.level,
       email: schema.players.email,
       phone: schema.players.phone,
+      rankedinId: schema.players.rankedinId,
     })
     .from(schema.players)
     .where(eq(schema.players.id, player.id));
@@ -45,6 +46,7 @@ async function Settings() {
             level: profile.level ?? "",
             email: profile.email ?? "",
             phone: profile.phone ?? "",
+            rankedinId: profile.rankedinId ?? "",
           }}
         />
       </section>

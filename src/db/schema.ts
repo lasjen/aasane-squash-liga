@@ -7,6 +7,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -42,6 +43,19 @@ export const players = pgTable("players", {
   level: playerLevel("level"),
   /** Plass i klubbens ranking, 1 er best. Null for spillere som ikke er rangert ennå. */
   ranking: integer("ranking"),
+  /**
+   * RankedIn-ID (f.eks. «R000002691») for spillere med nivå Proff, når kravet om
+   * norgesranking er slått på. Brukes til å sjekke plasseringen på nytt.
+   */
+  rankedinId: text("rankedin_id"),
+  /** Plassering på norgesrankingen sist den ble sjekket. */
+  rankedinStanding: smallint("rankedin_standing"),
+  rankedinCheckedAt: timestamp("rankedin_checked_at", { withTimezone: true }),
+  /**
+   * Status for proff-kravet: "ok" (innenfor grensen), "below" (falt utenfor ved siste sjekk),
+   * "unchecked" (RankedIn svarte ikke) eller "manual" (satt av admin). Null når kravet ikke gjelder.
+   */
+  proCheckStatus: text("pro_check_status"),
   /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
   passwordHash: text("password_hash"),
   /** Gir tilgang til /admin. Settes med `npm run admin`. */
@@ -53,6 +67,16 @@ export const players = pgTable("players", {
    */
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
+});
+
+/**
+ * Innstillinger admin kan endre, som nøkkel og JSON-verdi. Se src/lib/settings.ts
+ * for hvilke nøkler som finnes og standardverdiene deres.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamps.updatedAt,
 });
 
 /**

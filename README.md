@@ -39,6 +39,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
 | `rounds`           | Kampkvelder (torsdager) i en sesong, med status                |
 | `round_signups`    | Hvem som har meldt seg på en runde                             |
+| `app_settings`     | Innstillinger admin kan endre (nøkkel og JSON-verdi)           |
 | `cancelled_dates`  | Torsdager uten liga, med valgfri melding til spillerne         |
 | `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst                   |
 | `round_group_players` | Hvilken gruppe hver spiller er i                            |
@@ -240,6 +241,24 @@ Formatet låses når første resultat er registrert.
   (`src/lib/match-results.ts`).
 - Restart og endringer i gruppene under Edit setter opp kampene på nytt, og
   registrerte resultater i de berørte gruppene slettes.
+
+### Krav for nivå Proff (kan slås av og på)
+
+Under Admin → Innstillinger kan admin kreve at spillere som velger nivå Proff
+er rangert på norgesrankingen til Norges Squashforbund på RankedIn. Standard
+er av, med grensene topp 50 for herrer og topp 20 for damer.
+
+- Når kravet er på og nivå Proff velges (registrering, Innstillinger og
+  admin-skjemaet), henter skjemaet listen og spilleren velger seg selv.
+  Serveren sjekker at RankedIn-ID-en er innenfor grensen, mot herrelisten
+  for menn og damelisten for kvinner. Delt plass på grensen teller med.
+- Admin kan sette Proff uten RankedIn-valg; det merkes «satt av admin».
+- Svarer ikke RankedIn, godtas valget og merkes «ikke kontrollert».
+- Proff-spillerne sjekkes på nytt med «Sjekk proff-spillere nå» og når admin
+  trykker «Oppdater ranking». De som har falt utenfor, merkes i spillerlisten,
+  men beholder nivået.
+- Rankingen hentes fra RankedIns API (`src/lib/rankedin.ts`) og mellomlagres
+  i noen timer. API-et er ikke offisielt dokumentert og kan endres.
 
 ### Ranking
 

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import * as z from "zod";
 
 import { db, schema } from "@/db";
+import { resolveProFields } from "@/lib/pro-check";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { deleteOtherSessions, deleteSession, requirePlayer } from "@/lib/auth/session";
 import {
@@ -44,14 +45,21 @@ export async function updateProfile(
     level: text(formData, "level"),
     email: text(formData, "email"),
     phone: text(formData, "phone"),
+    rankedinId: text(formData, "rankedinId"),
   };
   const parsed = profileSchema.safeParse(values);
   if (!parsed.success) {
     return { errors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
+  const pro = await resolveProFields(parsed.data.level, parsed.data.gender, values.rankedinId || null);
+  if (!pro.ok) return { errors: { level: [pro.error] }, values };
+
   try {
-    await db.update(schema.players).set(parsed.data).where(eq(schema.players.id, player.id));
+    await db
+      .update(schema.players)
+      .set({ ...parsed.data, ...pro.fields })
+      .where(eq(schema.players.id, player.id));
   } catch (err) {
     if (isUniqueViolation(err)) {
       return { errors: { email: ["En annen spiller bruker allerede denne e-postadressen."] }, values };

@@ -14,6 +14,7 @@ import {
   type LoginField,
   type RegisterField,
 } from "@/lib/auth/validation";
+import { resolveProFields } from "@/lib/pro-check";
 import { playerHomePath } from "@/lib/rounds";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
@@ -34,6 +35,7 @@ export async function register(
     level: text(formData, "level"),
     email: text(formData, "email"),
     phone: text(formData, "phone"),
+    rankedinId: text(formData, "rankedinId"),
   };
   const parsed = registerSchema.safeParse({
     ...values,
@@ -45,6 +47,9 @@ export async function register(
   }
 
   const { firstName, lastName, gender, level, email, phone, password } = parsed.data;
+  const pro = await resolveProFields(level, gender, values.rankedinId || null);
+  if (!pro.ok) return { errors: { level: [pro.error] }, values };
+
   let playerId: number;
   try {
     const [player] = await db
@@ -56,6 +61,7 @@ export async function register(
         level,
         email,
         phone,
+        ...pro.fields,
         passwordHash: await hashPassword(password),
       })
       .returning({ id: schema.players.id });

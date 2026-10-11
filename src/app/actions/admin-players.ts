@@ -10,7 +10,9 @@ import { requireAdmin } from "@/lib/auth/admin-session";
 import { hashPassword } from "@/lib/auth/password";
 import type { FormState } from "@/lib/auth/validation";
 import { anonymizePlayer, isInRunningRound, removeFromRanking } from "@/lib/players/delete-player";
+import { recheckProPlayers, resolveProFields } from "@/lib/pro-check";
 import { buildRanking } from "@/lib/ranking";
+import { getProRequirement } from "@/lib/settings";
 
 type PlayerFormState = FormState<AdminPlayerField>;
 
@@ -39,7 +41,7 @@ function parsePlayerForm(formData: FormData) {
     active: values.active === "on",
     isAdmin: values.isAdmin === "on",
   });
-  return { values, parsed };
+  return { values: { ...values, rankedinId: text(formData, "rankedinId") }, parsed };
 }
 
 const emailTaken = (values: Record<string, string>): PlayerFormState => ({
@@ -56,9 +58,15 @@ export async function createPlayer(_prev: PlayerFormState, formData: FormData): 
   }
 
   const { password, ...player } = parsed.data;
+  // Admin kan sette Proff uten RankedIn-valg; det merkes da «satt av admin».
+  const pro = await resolveProFields(player.level, player.gender, values.rankedinId || null, {
+    allowWithout: true,
+  });
+  if (!pro.ok) return { errors: { level: [pro.error] }, values };
   try {
     await db.insert(schema.players).values({
       ...player,
+      ...pro.fields,
       passwordHash: password ? await hashPassword(password) : null,
     });
   } catch (err) {
@@ -90,6 +98,11 @@ export async function updatePlayer(
     };
   }
 
+  const pro = await resolveProFields(player.level, player.gender, values.rankedinId || null, {
+    allowWithout: true,
+  });
+  if (!pro.ok) return { errors: { level: [pro.error] }, values };
+
   try {
     const updated = await db.transaction(async (tx) => {
       // Inaktive spillere er ikke med i rankingen.
@@ -99,6 +112,7 @@ export async function updatePlayer(
         .update(schema.players)
         .set({
           ...player,
+          ...pro.fields,
           // Tomt passordfelt betyr at passordet ikke endres.
           ...(password && { passwordHash: await hashPassword(password) }),
         })
@@ -175,6 +189,10 @@ export async function deletePlayer(playerId: number) {
  */
 export async function updateRanking() {
   await requireAdmin();
+
+  // Proff-spillerne sjekkes mot norgesrankingen samtidig, når kravet er slått på.
+  const proRequirement = await getProRequirement();
+  if (proRequirement.enabled) await recheckProPlayers(proRequirement);
 
   const newlyRanked = await db.transaction(async (tx) => {
     // Låser spillerradene, så to samtidige oppdateringer ikke gir like plasser.

@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { changePassword, deleteAccount, updateProfile } from "@/app/actions/settings";
 import { Field, FormMessage, FormSuccess, RadioGroup, SubmitButton } from "@/components/form";
+import { ProSelect } from "@/components/pro-select";
 import type { ProfileField } from "@/lib/auth/validation";
 import { GENDER_LABELS, GENDERS, LEVEL_HINTS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 
@@ -71,6 +72,7 @@ export function ProfileForm({ profile }: { profile: Record<ProfileField, string>
         defaultValue={values.level}
         errors={errors?.level}
       />
+      <ProSelect defaultLevel={values.level} defaultRankedinId={values.rankedinId} />
       <SubmitButton pending={pending}>Lagre endringer</SubmitButton>
     </form>
   );

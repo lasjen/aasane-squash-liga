@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { db, schema } from "@/db";
 import { requireAdmin } from "@/lib/auth/admin-session";
 import { GENDER_LABELS, LEVEL_LABELS } from "@/lib/player-options";
+import { rankedinProfileUrl } from "@/lib/rankedin";
 
 import {
   ActivatePlayerButton,
@@ -82,6 +83,41 @@ async function AdminPlayers({
   );
 }
 
+const PRO_STATUS_TEXT: Record<string, string> = {
+  below: "utenfor grensen",
+  unchecked: "ikke kontrollert",
+  manual: "satt av admin",
+};
+
+/** RankedIn-plassering og status for proff-kravet, med lenke til RankedIn-profilen. */
+function ProStatus({
+  player,
+}: {
+  player: { rankedinId: string | null; rankedinStanding: number | null; proCheckStatus: string | null };
+}) {
+  const warn = player.proCheckStatus === "below" || player.proCheckStatus === "unchecked";
+  return (
+    <span className="block text-xs">
+      {player.rankedinId && (
+        <a
+          href={rankedinProfileUrl(player.rankedinId)}
+          target="_blank"
+          rel="noreferrer"
+          className="underline"
+        >
+          RankedIn{player.rankedinStanding ? ` #${player.rankedinStanding}` : ""}
+        </a>
+      )}
+      {player.proCheckStatus !== "ok" && (
+        <span className={warn ? "ml-1 text-amber-700 dark:text-amber-400" : "ml-1 text-zinc-500"}>
+          {warn && "⚠ "}
+          {PRO_STATUS_TEXT[player.proCheckStatus ?? ""]}
+        </span>
+      )}
+    </span>
+  );
+}
+
 async function PlayerTable() {
 
   const players = await db
@@ -96,6 +132,9 @@ async function PlayerTable() {
       active: schema.players.active,
       isAdmin: schema.players.isAdmin,
       ranking: schema.players.ranking,
+      rankedinId: schema.players.rankedinId,
+      rankedinStanding: schema.players.rankedinStanding,
+      proCheckStatus: schema.players.proCheckStatus,
     })
     .from(schema.players)
     // Slettede spillere vises ikke.
@@ -144,7 +183,10 @@ async function PlayerTable() {
               <td className="px-3 py-2">{p.email ?? "–"}</td>
               <td className="px-3 py-2 whitespace-nowrap">{p.phone ?? "–"}</td>
               <td className="px-3 py-2">{p.gender ? GENDER_LABELS[p.gender] : "–"}</td>
-              <td className="px-3 py-2">{p.level ? LEVEL_LABELS[p.level] : "–"}</td>
+              <td className="px-3 py-2">
+                {p.level ? LEVEL_LABELS[p.level] : "–"}
+                {p.level === "pro" && p.proCheckStatus && <ProStatus player={p} />}
+              </td>
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-3 text-zinc-900 dark:text-zinc-100">
                   <Link href={`/admin/spillere/${p.id}/endre`} className="font-medium underline">

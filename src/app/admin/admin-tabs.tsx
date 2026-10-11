@@ -7,6 +7,7 @@ const TABS = [
   { href: "/admin", label: "Spillere", match: (p: string) => p === "/admin" || p.startsWith("/admin/spillere") },
   { href: "/admin/runde", label: "Ligarunde", match: (p: string) => p.startsWith("/admin/runde") },
   { href: "/admin/resultater", label: "Resultater", match: (p: string) => p.startsWith("/admin/resultater") },
+  { href: "/admin/innstillinger", label: "Innstillinger", match: (p: string) => p.startsWith("/admin/innstillinger") },
 ];
 
 export function AdminTabs() {

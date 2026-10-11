@@ -127,6 +127,13 @@
       "when": 1791669850839,
       "tag": "0017_skjult-avlysning-og-slettet-spiller",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791735554873,
+      "tag": "0018_proff-krav-og-innstillinger",
+      "breakpoints": true
     }
   ]
 }
