@@ -39,6 +39,7 @@ function parsePlayerForm(formData: FormData) {
     email: text(formData, "email"),
     phone: text(formData, "phone"),
     active: formData.get("active") === "on" ? "on" : "",
+    isMember: formData.get("isMember") === "on" ? "on" : "",
     // Rollefeltet vises bare for admins. Mangler det, endres ikke rollen.
     role: text(formData, "role"),
   };
@@ -46,6 +47,7 @@ function parsePlayerForm(formData: FormData) {
     ...values,
     password: text(formData, "password"),
     active: values.active === "on",
+    isMember: values.isMember === "on",
     role: values.role || undefined,
   });
   return { values, parsed };
@@ -175,6 +177,9 @@ export async function updatePlayer(
         .map((k) => FIELD_LABELS[k]);
       if (password) changed.push("passord");
       if (before.active !== player.active) changed.push(player.active ? "aktivert" : "deaktivert");
+      if (before.isMember !== player.isMember) {
+        changed.push(player.isMember ? "merket som medlem" : "merket som ikke medlem");
+      }
       const name = fullName(before);
       if (changed.length > 0) {
         await logAction(actor, "spiller.endret", `Endret ${name}: ${changed.join(", ")}`, tx);

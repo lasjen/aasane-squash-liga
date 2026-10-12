@@ -1,0 +1,1 @@
+ALTER TABLE "players" ADD COLUMN "is_member" boolean DEFAULT false NOT NULL;

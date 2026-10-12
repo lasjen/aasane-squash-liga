@@ -141,6 +141,13 @@
       "when": 1791736585113,
       "tag": "0019_fjern-is-admin",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791823568507,
+      "tag": "0020_medlemskap",
+      "breakpoints": true
     }
   ]
 }

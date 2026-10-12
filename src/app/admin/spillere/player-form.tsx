@@ -107,6 +107,12 @@ export function PlayerForm({
           defaultChecked={values.active === "on"}
           hint="Inaktive spillere er ikke med i rankingen."
         />
+        <Checkbox
+          label="Medlem"
+          name="isMember"
+          defaultChecked={values.isMember === "on"}
+          hint="Kryss av når du har sjekket at spilleren er medlem i klubben."
+        />
       </div>
       {canEditRole && (
         <RadioGroup

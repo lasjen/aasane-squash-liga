@@ -58,6 +58,7 @@ async function EditPlayerForm({ params }: { params: Promise<{ id: string }> }) {
         email: player.email ?? "",
         phone: player.phone ?? "",
         active: player.active ? "on" : "",
+        isMember: player.isMember ? "on" : "",
         role: player.role,
       }}
       submitLabel="Lagre endringer"

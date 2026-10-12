@@ -50,6 +50,7 @@ export const adminPlayerSchema = z.object({
       .max(128, { error: "Passordet kan ha maks 128 tegn." }),
   ),
   active: z.boolean(),
+  isMember: z.boolean(),
   /** Bare med når en admin lagrer skjemaet. Mangler den, endres ikke rollen. */
   role: z.enum(ROLES, { error: "Velg en gyldig rolle." }).optional(),
 });

@@ -97,6 +97,7 @@ async function PlayerTable() {
       gender: schema.players.gender,
       level: schema.players.level,
       active: schema.players.active,
+      isMember: schema.players.isMember,
       role: schema.players.role,
       ranking: schema.players.ranking,
     })
@@ -126,6 +127,7 @@ async function PlayerTable() {
             <th className="px-3 py-2 font-medium">Mobil</th>
             <th className="px-3 py-2 font-medium">Kjønn</th>
             <th className="px-3 py-2 font-medium">Nivå</th>
+            <th className="px-3 py-2 font-medium">Medlem</th>
             <th className="px-3 py-2">
               <span className="sr-only">Handlinger</span>
             </th>
@@ -148,6 +150,13 @@ async function PlayerTable() {
               <td className="px-3 py-2 whitespace-nowrap">{p.phone ?? "–"}</td>
               <td className="px-3 py-2">{p.gender ? GENDER_LABELS[p.gender] : "–"}</td>
               <td className="px-3 py-2">{p.level ? LEVEL_LABELS[p.level] : "–"}</td>
+              <td className="px-3 py-2">
+                {p.isMember ? (
+                  "Ja"
+                ) : (
+                  <span className="font-medium text-amber-700 dark:text-amber-400">Ikke sjekket</span>
+                )}
+              </td>
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-3 text-zinc-900 dark:text-zinc-100">
                   <Link href={`/admin/spillere/${p.id}/endre`} className="font-medium underline">

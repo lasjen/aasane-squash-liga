@@ -54,6 +54,11 @@ export const players = pgTable("players", {
   role: playerRole("role").notNull().default("player"),
   active: boolean("active").notNull().default(true),
   /**
+   * Om operatøren har sjekket at spilleren er medlem i klubben. Starter som false,
+   * så spillere som ikke er sjekket ennå, vises som «ikke medlem».
+   */
+  isMember: boolean("is_member").notNull().default(false),
+  /**
    * Satt når admin har slettet spilleren. Personopplysningene er da fjernet og navnet
    * er «Tidligere spiller», men raden beholdes så kamper og resultatlister henger sammen.
    */

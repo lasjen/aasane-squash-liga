@@ -81,6 +81,7 @@ export async function anonymizePlayer(tx: Transaction, playerId: number) {
       passwordHash: null,
       role: "player",
       active: false,
+      isMember: false,
       ranking: null,
       deletedAt: new Date(),
     })
