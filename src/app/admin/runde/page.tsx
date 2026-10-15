@@ -13,6 +13,7 @@ import {
   movePlayer,
   removeCancelledDate,
   removeFromRound,
+  resetRound,
   restartRound,
   updateCancelledDate,
   setRoundFormat,
@@ -41,6 +42,10 @@ type Params = Record<string, string | string[] | undefined>;
 const MESSAGES: Record<string, (params: Params) => string> = {
   startet: () => "Runden er startet, og gruppene og kampene er satt opp.",
   restartet: () => "Gruppene og kampene er satt opp på nytt.",
+  reset: () =>
+    "Runden er satt tilbake til før start. Påmeldingen er åpen igjen, og du kan starte runden på nytt når du vil.",
+  "reset-for-sent": () =>
+    "Runden var en tidligere torsdag og kan ikke settes tilbake. Bruk «Restart runde» eller avslutt den.",
   "lagt-til": () => "Spilleren er lagt til.",
   fjernet: () => "Spilleren er fjernet fra runden.",
   flyttet: () => "Spilleren er flyttet.",
@@ -366,6 +371,18 @@ async function StartedRound({
           question="Vil du virkelig restarte? Gruppene og kampene settes opp på nytt fra påmeldingene. Endringer i gruppene og alle registrerte resultater forsvinner."
           confirmLabel="Ja, restart"
           pendingText="Restarter …"
+          className={secondaryButton}
+        />
+        <ConfirmButton
+          action={resetRound.bind(null, roundId)}
+          label="Reset runde"
+          question={`Sette runden tilbake til før «Start runde»? Gruppene og kampene slettes${
+            matches.length - missing > 0
+              ? `, sammen med ${matches.length - missing} ${matches.length - missing === 1 ? "registrert resultat" : "registrerte resultater"}`
+              : ""
+          }. Påmeldingene beholdes, og spillerne kan melde seg på og av igjen.`}
+          confirmLabel="Ja, reset"
+          pendingText="Resetter …"
           className={secondaryButton}
         />
         <Link href={editing ? "/admin/runde" : "/admin/runde?rediger=1"} className={secondaryButton}>

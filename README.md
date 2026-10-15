@@ -191,6 +191,9 @@ Fanen «Ligarunde» på `/admin/runde` styrer runden:
 - **Edit** lar admin flytte, fjerne og legge til spillere i gruppene.
   Kampene i berørte grupper settes opp på nytt.
 - **Restart runde** setter opp grupper og kamper på nytt fra påmeldingene.
+- **Reset runde** setter runden tilbake til før «Start runde»: grupper, kamper
+  og registrerte resultater slettes, og påmeldingen åpner igjen. Påmeldingene
+  beholdes, også endringer gjort under Edit. Går ikke for en torsdag som har vært.
 - **Avlys denne torsdagen** (før start) sletter runden og påmeldingene, og
   påmeldingen går videre til neste torsdag med liga. Admin kan skrive en
   melding til spillerne. Under «Torsdager uten liga» kan admin legge inn

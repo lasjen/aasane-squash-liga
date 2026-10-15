@@ -124,6 +124,39 @@ export async function restartRound(roundId: number) {
   redirect(`${PAGE}?melding=restartet`);
 }
 
+/**
+ * Setter runden tilbake til slik den var før «Start runde»: grupper, kamper og registrerte
+ * resultater slettes, statusen blir åpen igjen, og spillerne kan melde seg på og av.
+ * Påmeldingene beholdes. Går ikke for runder på en torsdag som har vært, for da ville
+ * runden blitt liggende åpen uten å være neste runde.
+ */
+export async function resetRound(roundId: number) {
+  const actor = await requireOperator();
+
+  const problem = await db.transaction(async (tx) => {
+    const [round] = await tx
+      .select({ status: schema.rounds.status, playedOn: schema.rounds.playedOn })
+      .from(schema.rounds)
+      .where(eq(schema.rounds.id, roundId))
+      .for("update");
+    if (round?.status !== "started") return "feil-status";
+    if (round.playedOn < osloToday()) return "reset-for-sent";
+    // Kampene og spillerne i gruppene slettes sammen med gruppene (ON DELETE CASCADE).
+    await tx.delete(schema.roundGroups).where(eq(schema.roundGroups.roundId, roundId));
+    await tx.delete(schema.matches).where(eq(schema.matches.roundId, roundId));
+    await tx.update(schema.rounds).set({ status: "open" }).where(eq(schema.rounds.id, roundId));
+    return null;
+  });
+
+  if (problem) redirect(`${PAGE}?melding=${problem}`);
+  await logAction(
+    actor,
+    "runde.reset",
+    `Resatte runden ${await roundLabel(roundId)} til før start (grupper, kamper og resultater slettet)`,
+  );
+  redirect(`${PAGE}?melding=reset`);
+}
+
 /** Avslutter runden: lager resultatlisten og oppdaterer rankingen. Krever resultat i alle kamper. */
 export async function finishRound(roundId: number) {
   const actor = await requireOperator();
