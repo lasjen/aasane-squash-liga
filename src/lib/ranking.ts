@@ -38,3 +38,21 @@ export function buildRanking(players: RankablePlayer[], random: () => number = M
 
   return [...ranked, ...groups.flat()].map((p) => p.id);
 }
+
+/** Om to rekkefølger inneholder nøyaktig de samme spillerne, uten duplikater. */
+export function sameRankingMembers(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return set.size === a.length && new Set(b).size === b.length && b.every((id) => set.has(id));
+}
+
+/**
+ * Hvem som har fått ny plass når rankingen endres fra `before` til `after`
+ * (begge er spiller-id-er fra plass 1 og nedover), sortert på ny plass.
+ */
+export function rankingMoves(before: number[], after: number[]) {
+  const oldPlace = new Map(before.map((id, i) => [id, i + 1]));
+  return after
+    .map((id, i) => ({ id, from: oldPlace.get(id) ?? null, to: i + 1 }))
+    .filter((m) => m.from !== m.to);
+}

@@ -260,6 +260,16 @@ Formatet låses når første resultat er registrert.
 
 Første gang, når ingen har ranking, blir hele rankingen altså laget ut fra nivå.
 
+**Endre rankingen for hånd.** Fanen «Ranking» på `/admin/ranking` viser aktive
+spillere med plass. Operatører og admins kan dra spillerne opp og ned med
+håndtaket (virker også på mobil), bruke pilknappene, eller piltastene når
+håndtaket har fokus. Ingenting lagres før man trykker **Publiser**; **Angre**
+går tilbake til rankingen slik den er publisert. Publiseringen avvises hvis
+rankingen er endret siden siden ble åpnet (f.eks. av en annen operatør eller
+fordi en runde ble avsluttet), og endringen loggføres. Merk at retting av
+resultater i den sist avsluttede runden regner rankingen ut på nytt og
+overskriver manuelle endringer gjort etter den runden.
+
 Prosjektet bruker Cache Components, så komponenter som leser innloggingen
 må ligge inni `<Suspense>`.
 

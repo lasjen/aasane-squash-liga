@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/admin", label: "Spillere", match: (p: string) => p === "/admin" || p.startsWith("/admin/spillere") },
+  { href: "/admin/ranking", label: "Ranking", match: (p: string) => p.startsWith("/admin/ranking") },
   { href: "/admin/runde", label: "Ligarunde", match: (p: string) => p.startsWith("/admin/runde") },
   { href: "/admin/resultater", label: "Resultater", match: (p: string) => p.startsWith("/admin/resultater") },
   { href: "/admin/logg", label: "Logg", match: (p: string) => p.startsWith("/admin/logg"), adminOnly: true },
