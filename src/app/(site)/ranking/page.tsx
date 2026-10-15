@@ -53,6 +53,12 @@ async function Ranking() {
 
   return (
     <>
+      {info.message && (
+        <section className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm whitespace-pre-line dark:border-zinc-800 dark:bg-zinc-900">
+          {info.message}
+        </section>
+      )}
+
       {info.updatedAt && (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Rankingen ble sist oppdatert {formatDateTime(info.updatedAt)}.
@@ -77,12 +83,6 @@ async function Ranking() {
           );
         })}
       </ol>
-
-      {info.message && (
-        <section className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm whitespace-pre-line dark:border-zinc-800 dark:bg-zinc-900">
-          {info.message}
-        </section>
-      )}
 
       {unranked.length > 0 && (
         <section className="flex flex-col gap-2">
