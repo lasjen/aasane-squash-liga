@@ -181,7 +181,7 @@ Fanen «Ligarunde» på `/admin/runde` styrer runden:
   ventelisten rykker da opp.
 - **Start runde** setter opp grupper og kamper. Spillerne sorteres etter
   ranking og deles i grupper på 3 og 4 (`src/lib/groups.ts`): 4 → [4],
-  6 → [3, 3], 7 → [3, 4], 16 → [4, 4, 4, 4]. 5 spillere blir én gruppe på 5.
+  6 → [3, 3], 7 → [4, 3], 16 → [4, 4, 4, 4]. 5 spillere blir én gruppe på 5.
 - **Kamper** (`src/lib/match-plan.ts`): i grupper på 3 spiller alle mot alle
   (1–2, 2–3, 1–3). I grupper på 4 spiller 1 mot 4 og 2 mot 3, deretter
   vinner mot vinner og taper mot taper. I gruppen på 5 fordeles spillerne

@@ -62,8 +62,8 @@ export default function RulesPage() {
             best rangerte.
           </li>
           <li>
-            Gruppene har 3 eller 4 spillere, og de minste gruppene ligger øverst. For eksempel
-            gir 6 spillere to grupper på 3, 7 spillere en gruppe på 3 og en på 4, og 16 spillere
+            Gruppene har 3 eller 4 spillere, og de største gruppene ligger øverst. For eksempel
+            gir 6 spillere to grupper på 3, 7 spillere en gruppe på 4 og en på 3, og 16 spillere
             fire grupper på 4.
           </li>
           <li>
