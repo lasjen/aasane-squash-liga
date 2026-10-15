@@ -148,6 +148,13 @@
       "when": 1791823568507,
       "tag": "0020_medlemskap",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792082180022,
+      "tag": "0021_ranking-melding",
+      "breakpoints": true
     }
   ]
 }

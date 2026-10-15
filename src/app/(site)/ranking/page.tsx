@@ -4,7 +4,9 @@ import { Suspense } from "react";
 
 import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
+import { formatDateTime } from "@/lib/dates";
 import { LEVEL_LABELS } from "@/lib/player-options";
+import { getRankingInfo } from "@/lib/ranking-info";
 
 export const metadata: Metadata = { title: "Ranking – Torsdagsligaen" };
 
@@ -21,6 +23,7 @@ export default function RankingPage() {
 
 async function Ranking() {
   const me = await requirePlayer();
+  const info = await getRankingInfo();
   const players = await db
     .select({
       id: schema.players.id,
@@ -50,6 +53,11 @@ async function Ranking() {
 
   return (
     <>
+      {info.updatedAt && (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Rankingen ble sist oppdatert {formatDateTime(info.updatedAt)}.
+        </p>
+      )}
       <ol className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         {ranked.map((p) => {
           const isMe = p.id === me.id;
@@ -69,6 +77,12 @@ async function Ranking() {
           );
         })}
       </ol>
+
+      {info.message && (
+        <section className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm whitespace-pre-line dark:border-zinc-800 dark:bg-zinc-900">
+          {info.message}
+        </section>
+      )}
 
       {unranked.length > 0 && (
         <section className="flex flex-col gap-2">

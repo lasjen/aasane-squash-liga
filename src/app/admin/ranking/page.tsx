@@ -6,9 +6,11 @@ import { Suspense } from "react";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { LEVEL_LABELS } from "@/lib/player-options";
+import { getRankingInfo } from "@/lib/ranking-info";
 import { findStartedRound } from "@/lib/rounds";
 
 import { RankingEditor } from "./ranking-editor";
+import { RankingMessageForm } from "./ranking-message-form";
 
 export const metadata: Metadata = { title: "Ranking – Konsoll – Torsdagsligaen" };
 
@@ -35,7 +37,7 @@ const noticeClass =
 async function Ranking() {
   await requireOperator();
 
-  const [players, [{ unranked }], startedRound] = await Promise.all([
+  const [players, [{ unranked }], startedRound, info] = await Promise.all([
     db
       .select({
         id: schema.players.id,
@@ -57,6 +59,7 @@ async function Ranking() {
         ),
       ),
     findStartedRound(),
+    getRankingInfo(),
   ]);
 
   return (
@@ -84,6 +87,7 @@ async function Ranking() {
           level: p.level ? LEVEL_LABELS[p.level] : null,
         }))}
       />
+      <RankingMessageForm initial={info.message ?? ""} />
       <p className="text-xs text-zinc-500">
         Merk: Rettes resultatene i den sist avsluttede runden etter at du har publisert, regnes
         rankingen ut på nytt fra rankingen før den runden, og endringene du har gjort her blir

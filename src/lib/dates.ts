@@ -44,3 +44,15 @@ export function formatRoundDate(date: string): string {
     timeZone: "UTC",
   }).format(toUtcDate(date));
 }
+
+/** F.eks. «15. oktober 2026 kl. 19:30», i norsk tid. */
+export function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("nb-NO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TIME_ZONE,
+  }).format(date);
+}

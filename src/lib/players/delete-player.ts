@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import { db, schema } from "@/db";
+import { touchRanking } from "@/lib/ranking-info";
 
 export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -16,6 +17,7 @@ export async function removeFromRanking(tx: Transaction, playerId: number) {
   if (player?.ranking == null) return;
 
   await tx.update(schema.players).set({ ranking: null }).where(eq(schema.players.id, playerId));
+  await touchRanking(tx);
   await tx
     .update(schema.players)
     .set({ ranking: sql`${schema.players.ranking} - 1` })

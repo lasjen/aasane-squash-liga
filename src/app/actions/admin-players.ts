@@ -18,6 +18,7 @@ import {
   type Transaction,
 } from "@/lib/players/delete-player";
 import { buildRanking } from "@/lib/ranking";
+import { touchRanking } from "@/lib/ranking-info";
 import { isOperatorRole, ROLE_LABELS, type Role } from "@/lib/roles";
 
 type PlayerFormState = FormState<AdminPlayerField>;
@@ -301,6 +302,7 @@ export async function updateRanking() {
       .set({ ranking: null })
       .where(eq(schema.players.active, false));
 
+    await touchRanking(tx);
     const newlyRanked = players.filter((p) => p.ranking === null).length;
     await logAction(
       actor,

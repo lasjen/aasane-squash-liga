@@ -86,6 +86,22 @@ export const auditLog = pgTable(
 );
 
 /**
+ * Melding og oppdateringstidspunkt for rankingen. Alltid én rad (id 1), laget første gang
+ * rankingen endres eller en melding lagres.
+ */
+export const rankingInfo = pgTable(
+  "ranking_info",
+  {
+    id: integer("id").primaryKey().default(1),
+    /** Melding fra admin som vises under rankingen. Null når det ikke er noen. */
+    message: text("message"),
+    /** Når rekkefølgen i rankingen sist ble endret. */
+    rankingUpdatedAt: timestamp("ranking_updated_at", { withTimezone: true }),
+  },
+  (t) => [check("ranking_info_single_row_check", sql`${t.id} = 1`)],
+);
+
+/**
  * Innloggingsøkter. Id-en er en SHA-256-hash av tokenet i cookien,
  * så en lekket database ikke kan brukes til å kapre økter.
  */

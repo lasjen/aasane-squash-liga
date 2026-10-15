@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { db, schema } from "@/db";
+import { touchRanking } from "@/lib/ranking-info";
 import { groupStandings, newRanking, resultOrder } from "@/lib/standings";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -107,6 +108,7 @@ export async function saveRoundResults(tx: Transaction, roundId: number) {
       FROM unnest(${sql.param(order)}::int[]) WITH ORDINALITY AS v(id, ranking)
       WHERE p.id = v.id
     `);
+    await touchRanking(tx);
   }
 
   await tx.delete(schema.roundResults).where(eq(schema.roundResults.roundId, roundId));

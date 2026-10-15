@@ -8,6 +8,7 @@ import { db, schema } from "@/db";
 import { logAction } from "@/lib/audit";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { rankingMoves, sameRankingMembers } from "@/lib/ranking";
+import { RANKING_MESSAGE_MAX, touchRanking } from "@/lib/ranking-info";
 
 export type PublishRankingResult =
   | { ok: true; moved: number }
@@ -68,6 +69,7 @@ export async function publishRanking(expected: number[], order: number[]): Promi
       FROM unnest(${sql.param(parsedOrder.data)}::int[]) WITH ORDINALITY AS v(id, ranking)
       WHERE p.id = v.id
     `);
+    await touchRanking(tx);
 
     // Loggen viser spillerne som er flyttet mer enn én plass. De som bare rykket én plass
     // fordi noen ble flyttet forbi dem, telles. Er alle flyttet én plass (f.eks. to naboer
@@ -92,4 +94,33 @@ export async function publishRanking(expected: number[], order: number[]): Promi
 
   if (result.ok) refresh();
   return result;
+}
+
+export type SaveMessageResult = { ok: true } | { ok: false; message: string };
+
+/** Lagrer meldingen som vises under rankingen. Tom melding fjerner den. */
+export async function saveRankingMessage(message: string): Promise<SaveMessageResult> {
+  const actor = await requireOperator();
+
+  const parsed = z.string().max(RANKING_MESSAGE_MAX).safeParse(message);
+  if (!parsed.success) {
+    return { ok: false, message: `Meldingen kan være maks ${RANKING_MESSAGE_MAX} tegn.` };
+  }
+  const text = parsed.data.trim() || null;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(schema.rankingInfo)
+      .values({ id: 1, message: text })
+      .onConflictDoUpdate({ target: schema.rankingInfo.id, set: { message: text } });
+    await logAction(
+      actor,
+      "ranking.melding",
+      text ? "Endret meldingen under rankingen" : "Fjernet meldingen under rankingen",
+      tx,
+    );
+  });
+
+  refresh();
+  return { ok: true };
 }
