@@ -6,7 +6,7 @@ import { signUp, withdraw } from "@/app/actions/signup";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
-import { formatRoundDate } from "@/lib/dates";
+import { formatRoundDate, formatRoundDateTime } from "@/lib/dates";
 import { MAX_PLAYERS } from "@/lib/groups";
 import { findNextRound, getSignups, getUpcomingCancellations } from "@/lib/rounds";
 
@@ -72,8 +72,9 @@ async function Signup({
             Neste runde{round ? ` · runde ${round.number}` : ""}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-            {formatRoundDate(date)}
+            {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
           </h1>
+          {round?.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{round?.timeNote}</p>}
         </div>
 
         {!me?.active ? (

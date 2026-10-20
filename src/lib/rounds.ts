@@ -35,6 +35,9 @@ export async function findNextRound(now: Date = new Date()) {
         number: schema.rounds.number,
         status: schema.rounds.status,
         bestOf: schema.rounds.bestOf,
+        startsAt: schema.rounds.startsAt,
+        endsAt: schema.rounds.endsAt,
+        timeNote: schema.rounds.timeNote,
       })
       .from(schema.rounds)
       .where(eq(schema.rounds.playedOn, date))
@@ -72,6 +75,9 @@ export async function findStartedRound() {
       number: schema.rounds.number,
       playedOn: schema.rounds.playedOn,
       bestOf: schema.rounds.bestOf,
+      startsAt: schema.rounds.startsAt,
+      endsAt: schema.rounds.endsAt,
+      timeNote: schema.rounds.timeNote,
     })
     .from(schema.rounds)
     .where(eq(schema.rounds.status, "started"))
@@ -171,7 +177,7 @@ export async function findAdminRound() {
   if (started) {
     return {
       date: started.playedOn,
-      round: { id: started.id, number: started.number, status: "started" as const, bestOf: started.bestOf },
+      round: { ...started, status: "started" as const },
     };
   }
   return findNextRound();

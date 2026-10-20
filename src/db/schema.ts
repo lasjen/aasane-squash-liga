@@ -12,6 +12,7 @@ import {
   primaryKey,
   smallint,
   text,
+  time,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
@@ -249,12 +250,18 @@ export const rounds = pgTable(
     status: roundStatus("status").notNull().default("open"),
     /** Kampformat: best av 3 eller best av 5 sett. */
     bestOf: smallint("best_of").notNull().default(3),
+    /** Når ligaen spilles denne torsdagen, i norsk tid. */
+    startsAt: time("starts_at").notNull().default("18:30"),
+    endsAt: time("ends_at").notNull().default("20:00"),
+    /** Valgfri melding til spillerne om tidspunktet, f.eks. hvorfor det er endret. */
+    timeNote: text("time_note"),
     ...timestamps,
   },
   (t) => [
     unique("rounds_season_number_unique").on(t.seasonId, t.number),
     unique("rounds_season_date_unique").on(t.seasonId, t.playedOn),
     check("rounds_best_of_check", sql`${t.bestOf} IN (3, 5)`),
+    check("rounds_time_check", sql`${t.startsAt} < ${t.endsAt}`),
   ],
 );
 

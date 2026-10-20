@@ -17,6 +17,7 @@ import {
   restartRound,
   updateCancelledDate,
   setRoundFormat,
+  setRoundTime,
   startRound,
 } from "@/app/actions/admin-round";
 import { adminSaveResult } from "@/app/actions/results";
@@ -25,7 +26,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
-import { formatRoundDate, osloToday } from "@/lib/dates";
+import { DEFAULT_ENDS_AT, DEFAULT_STARTS_AT, formatRoundDate, formatRoundDateTime, formatTime, osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem } from "@/lib/groups";
 import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
 import { BEST_OF_OPTIONS, DEFAULT_BEST_OF } from "@/lib/score";
@@ -54,6 +55,9 @@ const MESSAGES: Record<string, (params: Params) => string> = {
   "velg-spiller": () => "Velg en spiller å legge til.",
   "feil-status": () => "Runden har endret status i mellomtiden. Se oppdatert status under.",
   format: () => "Kampformatet er lagret.",
+  tid: () => "Klokkeslettet er lagret.",
+  "ukjent-tid": () => "Skriv klokkeslettene som tt:mm.",
+  "tid-rekkefolge": () => "Slutten må være etter starten.",
   "mangler-resultater": () => "Runden kan ikke avsluttes før alle kampene har resultat.",
   avlyst: (params) => {
     const removed = Number(params.slettet) || 0;
@@ -109,7 +113,7 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
           {started ? "i gang" : "påmelding åpen"}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-          {formatRoundDate(date)}
+          {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
         </h1>
       </div>
 
@@ -123,6 +127,13 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
       )}
 
       <FormatForm date={date} bestOf={round?.bestOf ?? DEFAULT_BEST_OF} roundId={round?.id ?? null} />
+
+      <TimeForm
+        date={date}
+        startsAt={round?.startsAt ?? DEFAULT_STARTS_AT}
+        endsAt={round?.endsAt ?? DEFAULT_ENDS_AT}
+        timeNote={round?.timeNote ?? null}
+      />
 
       {!started && (
         <CancelRoundButton
@@ -245,6 +256,47 @@ async function FormatForm({
       </select>
       <PendingButton pendingText="Lagrer …" className={smallButton}>
         Lagre
+      </PendingButton>
+    </form>
+  );
+}
+
+/** Når ligaen spilles denne torsdagen, og en valgfri melding til spillerne om tiden. */
+function TimeForm({
+  date,
+  startsAt,
+  endsAt,
+  timeNote,
+}: {
+  date: string;
+  startsAt: string;
+  endsAt: string;
+  timeNote: string | null;
+}) {
+  const input = "rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900";
+  return (
+    <form action={setRoundTime.bind(null, date)} className="flex flex-wrap items-end gap-2 text-sm">
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Fra</span>
+        <input type="time" name="startsAt" required defaultValue={formatTime(startsAt)} className={input} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Til</span>
+        <input type="time" name="endsAt" required defaultValue={formatTime(endsAt)} className={input} />
+      </label>
+      <label className="flex min-w-48 flex-1 flex-col gap-1">
+        <span className="font-medium">Melding til spillerne (valgfritt)</span>
+        <input
+          type="text"
+          name="timeNote"
+          maxLength={300}
+          defaultValue={timeNote ?? ""}
+          placeholder="F.eks. Vi starter senere fordi banene er opptatt."
+          className={input}
+        />
+      </label>
+      <PendingButton pendingText="Lagrer …" className={smallButton}>
+        Lagre tid
       </PendingButton>
     </form>
   );

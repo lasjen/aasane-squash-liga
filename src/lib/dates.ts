@@ -45,6 +45,22 @@ export function formatRoundDate(date: string): string {
   }).format(toUtcDate(date));
 }
 
+/** Når ligaen spilles hvis admin ikke har satt noe annet for runden. */
+export const DEFAULT_STARTS_AT = "18:30";
+export const DEFAULT_ENDS_AT = "20:00";
+
+/** Klokkeslett fra databasen («18:30:00») eller et skjema («18:30») som «18:30». */
+export const formatTime = (time: string) => time.slice(0, 5);
+
+/** F.eks. «torsdag 15. oktober (18:30 – 20:00)». */
+export function formatRoundDateTime(
+  date: string,
+  startsAt: string = DEFAULT_STARTS_AT,
+  endsAt: string = DEFAULT_ENDS_AT,
+): string {
+  return `${formatRoundDate(date)} (${formatTime(startsAt)} – ${formatTime(endsAt)})`;
+}
+
 /** F.eks. «15. oktober 2026 kl. 19:30», i norsk tid. */
 export function formatDateTime(date: Date): string {
   return new Intl.DateTimeFormat("nb-NO", {

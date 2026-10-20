@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { getCurrentPlayer } from "@/lib/auth/session";
-import { formatRoundDate } from "@/lib/dates";
+import { formatRoundDate, formatRoundDateTime } from "@/lib/dates";
 import { MAX_PLAYERS } from "@/lib/groups";
 import { LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 import {
@@ -170,8 +170,9 @@ async function NextRound() {
           Runde i gang nå
         </p>
         <p className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-          {formatRoundDate(started.playedOn)}
+          {formatRoundDateTime(started.playedOn, started.startsAt, started.endsAt)}
         </p>
+        {started.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{started.timeNote}</p>}
         <p className="text-zinc-600 dark:text-zinc-400">
           Gruppene og kampene er satt opp. Logg inn for å se kampene og registrere resultater.
         </p>
@@ -203,8 +204,9 @@ async function NextRound() {
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">Neste runde</p>
           <p className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-            {formatRoundDate(date)}
+            {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
           </p>
+          {round?.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{round?.timeNote}</p>}
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           {taken} av {MAX_PLAYERS} plasser tatt

@@ -5,7 +5,7 @@ import { confirmMatchResult, reportResult } from "@/app/actions/results";
 import { MatchList } from "@/components/match-list";
 import { isPoolSource } from "@/lib/match-plan";
 import { requirePlayer } from "@/lib/auth/session";
-import { formatRoundDate } from "@/lib/dates";
+import { formatRoundDateTime } from "@/lib/dates";
 import { getRoundMatches } from "@/lib/round-matches";
 import { findStartedRound, getGroups } from "@/lib/rounds";
 
@@ -70,8 +70,9 @@ async function League() {
           Runde {round.number} · i gang
         </p>
         <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-          {formatRoundDate(round.playedOn)}
+          {formatRoundDateTime(round.playedOn, round.startsAt, round.endsAt)}
         </h1>
+        {round.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{round.timeNote}</p>}
         <p className="text-zinc-600 dark:text-zinc-400">
           {myGroup ? `Du spiller i ${myGroup.label.toLowerCase()}.` : "Du er ikke med i denne runden."}
         </p>

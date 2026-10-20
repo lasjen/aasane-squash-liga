@@ -243,6 +243,34 @@ export async function setRoundFormat(date: string, formData: FormData) {
   redirect(`${PAGE}?melding=${outcome}`);
 }
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Setter når ligaen spilles på datoen, med en valgfri melding til spillerne. */
+export async function setRoundTime(date: string, formData: FormData) {
+  const actor = await requireOperator();
+  const startsAt = String(formData.get("startsAt") ?? "").slice(0, 5);
+  const endsAt = String(formData.get("endsAt") ?? "").slice(0, 5);
+  const timeNote = String(formData.get("timeNote") ?? "").trim().slice(0, 300) || null;
+  if (!TIME_PATTERN.test(startsAt) || !TIME_PATTERN.test(endsAt)) redirect(`${PAGE}?melding=ukjent-tid`);
+  if (startsAt >= endsAt) redirect(`${PAGE}?melding=tid-rekkefolge`);
+
+  const outcome = await db.transaction(async (tx) => {
+    const round = await ensureRound(tx, date);
+    if ((await lockRound(tx, round.id)) === "finished") return "feil-status";
+    await tx.update(schema.rounds).set({ startsAt, endsAt, timeNote }).where(eq(schema.rounds.id, round.id));
+    return "tid";
+  });
+
+  if (outcome === "tid") {
+    await logAction(
+      actor,
+      "runde.tid",
+      `Satte tiden ${startsAt}–${endsAt} for ${formatRoundDate(date)}${timeNote ? `: «${timeNote}»` : ""}`,
+    );
+  }
+  redirect(`${PAGE}?melding=${outcome}`);
+}
+
 /** Legger en spiller til neste runde før den er startet. Er runden full, havner spilleren på venteliste. */
 export async function addToRound(date: string, playerId: number) {
   const actor = await requireOperator();
