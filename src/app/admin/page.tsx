@@ -155,11 +155,7 @@ async function PlayerTable() {
               </td>
               <td className="px-3 py-2">{p.level ? LEVEL_LABELS[p.level] : "–"}</td>
               <td className="px-3 py-2">
-                {p.isMember ? (
-                  "Ja"
-                ) : (
-                  <span className="font-medium text-amber-700 dark:text-amber-400">Ikke sjekket</span>
-                )}
+                {p.isMember ? "Ja" : "–"}
               </td>
               <td className="px-3 py-2">
                 <div className="flex justify-end gap-3 text-zinc-900 dark:text-zinc-100">
