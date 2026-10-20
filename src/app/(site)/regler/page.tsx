@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { MAX_PLAYERS, MIN_PLAYERS } from "@/lib/groups";
+import { MAX_PLAYERS, MIN_LEAGUE_PLAYERS, MIN_PLAYERS } from "@/lib/groups";
+import { MIN_WOMENS_LEAGUE_PLAYERS, WOMENS_LEAGUE_CHECKBOX_LABEL } from "@/lib/leagues";
 import { LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 import { DEFAULT_BEST_OF, setsToWin } from "@/lib/score";
 
@@ -69,6 +70,28 @@ export default function RulesPage() {
           <li>
             Med 5 spillere blir det én gruppe på 5 (se under). Det trengs minst {MIN_PLAYERS}{" "}
             spillere for å starte en runde.
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="Dameliga">
+        <ul className={list}>
+          <li>
+            Kvinner kan krysse av for «{WOMENS_LEAGUE_CHECKBOX_LABEL}» under Innstillinger.
+          </li>
+          <li>
+            Er minst {MIN_WOMENS_LEAGUE_PLAYERS} av de påmeldte kvinnene med i dameligaen, spiller de i
+            egne damegrupper, satt opp etter dameligaens ranking. Resten spiller i «Alle» som vanlig.
+            Med dameliga holder det med {MIN_LEAGUE_PLAYERS} spillere i hver liga.
+          </li>
+          <li>
+            Blir det færre enn {MIN_LEAGUE_PLAYERS} igjen i «Alle», spiller alle sammen i «Alle» den
+            runden.
+          </li>
+          <li>
+            Dameligaen har sin egen ranking, som oppdateres etter samme regler som «Alle». Kvinnene er
+            fortsatt med i «Alle»-rankingen, og så lenge de spiller dameliga, beholder de plassen sin
+            der i stedet for å rykke ned.
           </li>
         </ul>
       </Section>

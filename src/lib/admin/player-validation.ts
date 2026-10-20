@@ -51,6 +51,8 @@ export const adminPlayerSchema = z.object({
   ),
   active: z.boolean(),
   isMember: z.boolean(),
+  /** Lagres bare som true for kvinner. */
+  wantsWomensLeague: z.boolean(),
   /** Bare med når en admin lagrer skjemaet. Mangler den, endres ikke rollen. */
   role: z.enum(ROLES, { error: "Velg en gyldig rolle." }).optional(),
 });

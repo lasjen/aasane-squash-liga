@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { LeagueSwitch, leagueFromParams } from "@/components/league-switch";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
+import { MIN_WOMENS_LEAGUE_PLAYERS } from "@/lib/leagues";
 import { LEVEL_LABELS } from "@/lib/player-options";
 import { getRankingInfo } from "@/lib/ranking-info";
 import { findStartedRound } from "@/lib/rounds";
@@ -14,7 +16,9 @@ import { RankingMessageForm } from "./ranking-message-form";
 
 export const metadata: Metadata = { title: "Ranking – Konsoll – Torsdagsligaen" };
 
-export default function AdminRankingPage() {
+type Params = Record<string, string | string[] | undefined>;
+
+export default function AdminRankingPage({ searchParams }: PageProps<"/admin/ranking">) {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10">
       <div className="flex flex-col gap-1">
@@ -25,7 +29,7 @@ export default function AdminRankingPage() {
         </p>
       </div>
       <Suspense fallback={<p className="text-zinc-500">Henter rankingen …</p>}>
-        <Ranking />
+        <Ranking searchParams={searchParams} />
       </Suspense>
     </main>
   );
@@ -34,10 +38,11 @@ export default function AdminRankingPage() {
 const noticeClass =
   "rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100";
 
-async function Ranking() {
+async function Ranking({ searchParams }: { searchParams: Promise<Params> }) {
   await requireOperator();
+  const league = leagueFromParams(await searchParams);
 
-  const [players, [{ unranked }], startedRound, info] = await Promise.all([
+  const rankedIn = (column: typeof schema.players.ranking | typeof schema.players.womenRanking) =>
     db
       .select({
         id: schema.players.id,
@@ -46,8 +51,12 @@ async function Ranking() {
         level: schema.players.level,
       })
       .from(schema.players)
-      .where(and(eq(schema.players.active, true), isNotNull(schema.players.ranking)))
-      .orderBy(asc(schema.players.ranking), asc(schema.players.id)),
+      .where(and(eq(schema.players.active, true), isNotNull(column)))
+      .orderBy(asc(column), asc(schema.players.id));
+
+  const [open, women, [{ unranked }], startedRound, info] = await Promise.all([
+    rankedIn(schema.players.ranking),
+    rankedIn(schema.players.womenRanking),
     db
       .select({ unranked: count() })
       .from(schema.players)
@@ -61,16 +70,22 @@ async function Ranking() {
     findStartedRound(),
     getRankingInfo(),
   ]);
+  const players = league === "women" ? women : open;
 
   return (
     <>
+      <LeagueSwitch
+        basePath="/admin/ranking"
+        league={league}
+        counts={{ open: open.length, women: women.length }}
+      />
       {startedRound && (
         <p className={noticeClass}>
           En runde er i gang, og gruppene er allerede satt opp. Endringer du publiserer nå, blir
           utgangspunktet for den nye rankingen når runden avsluttes.
         </p>
       )}
-      {unranked > 0 && (
+      {league === "open" && unranked > 0 && (
         <p className={noticeClass}>
           {unranked} {unranked === 1 ? "aktiv spiller har" : "aktive spillere har"} ikke plass i
           rankingen ennå. Trykk «Oppdater ranking» under{" "}
@@ -80,14 +95,23 @@ async function Ranking() {
           for å gi dem en plass, så kan du flytte dem her.
         </p>
       )}
+      {league === "women" && (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Her er de aktive kvinnene som har krysset av for dameliga. Nye kommer nederst, i samme
+          rekkefølge som i «Alle». Er minst {MIN_WOMENS_LEAGUE_PLAYERS} av dem påmeldt, spiller de
+          egne damegrupper satt opp etter denne rankingen, og beholder plassen sin i «Alle».
+        </p>
+      )}
       <RankingEditor
+        key={league}
+        league={league}
         players={players.map((p) => ({
           id: p.id,
           name: `${p.firstName} ${p.lastName}`,
           level: p.level ? LEVEL_LABELS[p.level] : null,
         }))}
       />
-      <RankingMessageForm initial={info.message ?? ""} />
+      {league === "open" && <RankingMessageForm initial={info.message ?? ""} />}
       <p className="text-xs text-zinc-500">
         Merk: Rettes resultatene i den sist avsluttede runden etter at du har publisert, regnes
         rankingen ut på nytt fra rankingen før den runden, og endringene du har gjort her blir

@@ -95,6 +95,7 @@ async function PlayerTable() {
       email: schema.players.email,
       phone: schema.players.phone,
       gender: schema.players.gender,
+      wantsWomensLeague: schema.players.wantsWomensLeague,
       level: schema.players.level,
       active: schema.players.active,
       isMember: schema.players.isMember,
@@ -148,7 +149,10 @@ async function PlayerTable() {
               </td>
               <td className="px-3 py-2">{p.email ?? "–"}</td>
               <td className="px-3 py-2 whitespace-nowrap">{p.phone ?? "–"}</td>
-              <td className="px-3 py-2">{p.gender ? GENDER_LABELS[p.gender] : "–"}</td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {p.gender ? GENDER_LABELS[p.gender] : "–"}
+                {p.wantsWomensLeague && <span className="ml-1.5 text-xs text-zinc-500">(dameliga)</span>}
+              </td>
               <td className="px-3 py-2">{p.level ? LEVEL_LABELS[p.level] : "–"}</td>
               <td className="px-3 py-2">
                 {p.isMember ? (

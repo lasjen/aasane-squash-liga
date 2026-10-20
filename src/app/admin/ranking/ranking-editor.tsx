@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { publishRanking } from "@/app/actions/admin-ranking";
+import type { League } from "@/lib/leagues";
 
 export type RankingRow = { id: number; name: string; level: string | null };
 
@@ -31,7 +32,7 @@ const SCROLL_EDGE = 80;
  * Dra og slipp bruker pointer events i stedet for HTML5 drag and drop, så det virker
  * både med mus og på mobil.
  */
-export function RankingEditor({ players }: { players: RankingRow[] }) {
+export function RankingEditor({ players, league }: { players: RankingRow[]; league: League }) {
   const router = useRouter();
   const [saved, setSaved] = useState(players);
   const [order, setOrder] = useState(players);
@@ -139,7 +140,7 @@ export function RankingEditor({ players }: { players: RankingRow[] }) {
     const expected = saved.map((p) => p.id);
     const next = order.map((p) => p.id);
     startTransition(async () => {
-      const result = await publishRanking(expected, next);
+      const result = await publishRanking(league, expected, next);
       if (result.ok) {
         setSaved(order);
         setStatus({
@@ -209,7 +210,7 @@ export function RankingEditor({ players }: { players: RankingRow[] }) {
 
       <ol
         className="divide-y divide-zinc-200 overflow-hidden rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800"
-        aria-label="Ranking"
+        aria-label={league === "women" ? "Dameligaens ranking" : "Ranking"}
       >
         {order.map((p, i) => {
           const place = i + 1;

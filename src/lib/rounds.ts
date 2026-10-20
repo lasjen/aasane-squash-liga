@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, isNull, lte, max, or, sql } from "drizzle-orm"
 
 import { db, schema } from "@/db";
 import { addDays, osloToday, seasonFor, thursdayOnOrAfter } from "@/lib/dates";
+import { groupLabel, type League } from "@/lib/leagues";
 
 type Db = typeof db;
 type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -150,6 +151,10 @@ export async function getSignups(roundId: number) {
       lastName: schema.players.lastName,
       level: schema.players.level,
       ranking: schema.players.ranking,
+      womenRanking: schema.players.womenRanking,
+      gender: schema.players.gender,
+      wantsWomensLeague: schema.players.wantsWomensLeague,
+      active: schema.players.active,
     })
     .from(schema.roundSignups)
     .innerJoin(schema.players, eq(schema.players.id, schema.roundSignups.playerId))
@@ -172,37 +177,50 @@ export async function findAdminRound() {
   return findNextRound();
 }
 
-/** Gruppene i runden med spillerne sortert etter ranking. */
+/**
+ * Gruppene i runden, «Alle» først og så damegruppene, med spillerne sortert etter ranking.
+ * `ranking` er plassen i ligaen gruppen hører til (dameligaens ranking i damegrupper).
+ */
 export async function getGroups(roundId: number) {
   const rows = await db
     .select({
       groupId: schema.roundGroups.id,
+      league: schema.roundGroups.league,
       number: schema.roundGroups.number,
       playerId: schema.players.id,
       firstName: schema.players.firstName,
       lastName: schema.players.lastName,
       ranking: schema.players.ranking,
+      womenRanking: schema.players.womenRanking,
     })
     .from(schema.roundGroups)
     .leftJoin(schema.roundGroupPlayers, eq(schema.roundGroupPlayers.groupId, schema.roundGroups.id))
     .leftJoin(schema.players, eq(schema.players.id, schema.roundGroupPlayers.playerId))
     .where(eq(schema.roundGroups.roundId, roundId))
     .orderBy(
+      asc(schema.roundGroups.league),
       asc(schema.roundGroups.number),
+      sql`case when ${schema.roundGroups.league} = 'women' then ${schema.players.womenRanking} end asc nulls last`,
       sql`${schema.players.ranking} asc nulls last`,
       asc(schema.players.lastName),
     );
 
-  const groups = new Map<number, { id: number; number: number; players: GroupPlayer[] }>();
+  const groups = new Map<number, RoundGroup>();
   for (const row of rows) {
-    const group = groups.get(row.groupId) ?? { id: row.groupId, number: row.number, players: [] };
+    const group = groups.get(row.groupId) ?? {
+      id: row.groupId,
+      league: row.league,
+      number: row.number,
+      label: groupLabel(row.league, row.number),
+      players: [],
+    };
     groups.set(row.groupId, group);
     if (row.playerId !== null) {
       group.players.push({
         id: row.playerId,
         firstName: row.firstName!,
         lastName: row.lastName!,
-        ranking: row.ranking,
+        ranking: row.league === "women" ? row.womenRanking : row.ranking,
       });
     }
   }
@@ -210,3 +228,4 @@ export async function getGroups(roundId: number) {
 }
 
 type GroupPlayer = { id: number; firstName: string; lastName: string; ranking: number | null };
+export type RoundGroup = { id: number; league: League; number: number; label: string; players: GroupPlayer[] };
