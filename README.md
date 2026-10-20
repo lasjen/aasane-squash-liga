@@ -19,6 +19,24 @@ npm run dev
 
 Åpne deretter [http://localhost:3000](http://localhost:3000) i nettleseren.
 
+### Start og stopp med skript
+
+Når Docker kjører, kan du gjøre alt over med ett skript:
+
+```bash
+./start.sh   # .env, npm install ved behov, database, migrasjoner, testdata og dev-server
+./stop.sh    # stopper dev-serveren og databasen
+```
+
+- `start.sh` lager `.env` fra `.env.example` hvis den mangler, og kjører
+  `npm install` bare når `node_modules` mangler eller `package-lock.json` er
+  endret. Testdata som mangler legges inn hver gang, så slettede testspillere
+  kommer tilbake.
+- Dev-serveren kjører i vinduet du startet fra. Stopp den med Ctrl+C eller
+  med `./stop.sh` fra et annet vindu.
+- `stop.sh` stopper også databasen. Dataene ligger i Docker-volumet `pgdata`
+  og blir tatt vare på til neste gang.
+
 ## Database
 
 PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
