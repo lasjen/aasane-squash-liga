@@ -7,7 +7,8 @@ import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
 import { formatRoundDate, osloToday } from "@/lib/dates";
-import { MAX_PLAYERS, groupSizeProblem, splitIntoGroups } from "@/lib/groups";
+import { MAX_PLAYERS } from "@/lib/groups";
+import { groupLabel, planRoundGroups } from "@/lib/leagues";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
 import { ensureRound } from "@/lib/rounds";
@@ -49,38 +50,53 @@ async function groupOf(tx: Transaction, roundId: number, playerId: number) {
 /**
  * Setter opp gruppene og kampene på nytt fra påmeldingene: de første MAX_PLAYERS påmeldte,
  * sortert etter ranking. Spillere uten ranking kommer sist, i påmeldingsrekkefølge.
+ * Vil minst 3 av kvinnene spille dameliga, får de egne damegrupper sortert etter
+ * dameligaens ranking (se planRoundGroups).
  * Returnerer antall spillere hvis antallet ikke lar seg dele i grupper, ellers null.
  */
 async function buildGroups(tx: Transaction, roundId: number): Promise<number | null> {
   const participants = await tx
-    .select({ id: schema.players.id, ranking: schema.players.ranking })
+    .select({
+      id: schema.players.id,
+      ranking: schema.players.ranking,
+      womenRanking: schema.players.womenRanking,
+      gender: schema.players.gender,
+      wantsWomensLeague: schema.players.wantsWomensLeague,
+      active: schema.players.active,
+    })
     .from(schema.roundSignups)
     .innerJoin(schema.players, eq(schema.players.id, schema.roundSignups.playerId))
     .where(eq(schema.roundSignups.roundId, roundId))
     .orderBy(asc(schema.roundSignups.createdAt))
     .limit(MAX_PLAYERS);
 
-  if (groupSizeProblem(participants.length)) return participants.length;
-
   // Array.sort er stabil, så spillere uten ranking beholder påmeldingsrekkefølgen.
-  const sorted = [...participants].sort(
-    (a, b) => (a.ranking ?? Infinity) - (b.ranking ?? Infinity),
+  type P = (typeof participants)[number];
+  const byRanking = (a: P, b: P) => (a.ranking ?? Infinity) - (b.ranking ?? Infinity);
+  const plan = planRoundGroups(
+    participants,
+    byRanking,
+    (a, b) => (a.womenRanking ?? Infinity) - (b.womenRanking ?? Infinity) || byRanking(a, b),
   );
-  const groups = splitIntoGroups(sorted)!;
+  if (!plan) return participants.length;
+
+  const groups = [
+    ...plan.open.map((players, i) => ({ league: "open" as const, number: i + 1, players })),
+    ...plan.women.map((players, i) => ({ league: "women" as const, number: i + 1, players })),
+  ];
 
   await tx.delete(schema.roundGroups).where(eq(schema.roundGroups.roundId, roundId));
   const created = await tx
     .insert(schema.roundGroups)
-    .values(groups.map((_, i) => ({ roundId, number: i + 1 })))
-    .returning({ id: schema.roundGroups.id, number: schema.roundGroups.number });
-  const idByNumber = new Map(created.map((g) => [g.number, g.id]));
+    .values(groups.map((g) => ({ roundId, league: g.league, number: g.number })))
+    .returning({ id: schema.roundGroups.id, league: schema.roundGroups.league, number: schema.roundGroups.number });
+  const idOf = (league: string, number: number) =>
+    created.find((c) => c.league === league && c.number === number)!.id;
 
   await tx.insert(schema.roundGroupPlayers).values(
-    groups.flatMap((players, i) =>
-      players.map((p) => ({ roundId, groupId: idByNumber.get(i + 1)!, playerId: p.id })),
-    ),
+    groups.flatMap((g) => g.players.map((p) => ({ roundId, groupId: idOf(g.league, g.number), playerId: p.id }))),
   );
-  await regenerate(tx, roundId, [...idByNumber.values()]);
+  await regenerate(tx, roundId, created.map((c) => c.id));
   return null;
 }
 
@@ -277,17 +293,19 @@ export async function removeFromRound(roundId: number, playerId: number, fromEdi
   redirect(fromEdit ? `${EDIT_PAGE}&melding=fjernet` : `${PAGE}?melding=fjernet`);
 }
 
-/** Flytter en spiller til gruppen som er valgt i skjemaet. */
+/** Flytter en spiller til gruppen som er valgt i skjemaet (gruppens id, også på tvers av ligaene). */
 export async function movePlayer(roundId: number, playerId: number, formData: FormData) {
   const actor = await requireOperator();
-  const groupNumber = Number(formData.get("group"));
+  const groupId = Number(formData.get("group"));
 
   const moved = await db.transaction(async (tx) => {
-    const [group] = await tx
-      .select({ id: schema.roundGroups.id })
-      .from(schema.roundGroups)
-      .where(and(eq(schema.roundGroups.roundId, roundId), eq(schema.roundGroups.number, groupNumber)));
-    if (!group) return false;
+    const [group] = Number.isSafeInteger(groupId)
+      ? await tx
+          .select({ id: schema.roundGroups.id, league: schema.roundGroups.league, number: schema.roundGroups.number })
+          .from(schema.roundGroups)
+          .where(and(eq(schema.roundGroups.roundId, roundId), eq(schema.roundGroups.id, groupId)))
+      : [];
+    if (!group) return null;
     const oldGroupId = await groupOf(tx, roundId, playerId);
     await tx
       .update(schema.roundGroupPlayers)
@@ -296,14 +314,14 @@ export async function movePlayer(roundId: number, playerId: number, formData: Fo
         and(eq(schema.roundGroupPlayers.roundId, roundId), eq(schema.roundGroupPlayers.playerId, playerId)),
       );
     await regenerate(tx, roundId, [oldGroupId, group.id]);
-    return true;
+    return groupLabel(group.league, group.number);
   });
 
   if (moved) {
     await logAction(
       actor,
       "runde.spiller-flyttet",
-      `Flyttet ${await playerLabel(playerId)} til gruppe ${groupNumber} (${await roundLabel(roundId)})`,
+      `Flyttet ${await playerLabel(playerId)} til ${moved.toLowerCase()} (${await roundLabel(roundId)})`,
     );
   }
   redirect(`${EDIT_PAGE}&melding=${moved ? "flyttet" : "ukjent-gruppe"}`);
@@ -329,13 +347,13 @@ export async function addToGroup(roundId: number, groupId: number, formData: For
   });
 
   const [group] = await db
-    .select({ number: schema.roundGroups.number })
+    .select({ league: schema.roundGroups.league, number: schema.roundGroups.number })
     .from(schema.roundGroups)
     .where(eq(schema.roundGroups.id, groupId));
   await logAction(
     actor,
     "runde.spiller-lagt-i-gruppe",
-    `La ${await playerLabel(playerId)} til i gruppe ${group?.number ?? "?"} (${await roundLabel(roundId)})`,
+    `La ${await playerLabel(playerId)} til i ${group ? groupLabel(group.league, group.number).toLowerCase() : "gruppe ?"} (${await roundLabel(roundId)})`,
   );
   redirect(`${EDIT_PAGE}&melding=lagt-til`);
 }

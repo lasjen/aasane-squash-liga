@@ -4,6 +4,11 @@
 /** Maks antall spillere i en runde. De som melder seg på etter dette, står på venteliste. */
 export const MAX_PLAYERS = 16;
 export const MIN_PLAYERS = 4;
+/**
+ * Minste antall i en liga når runden deles i «Alle» og dameliga. Da holder en gruppe på 3.
+ * Se planRoundGroups i src/lib/leagues.ts.
+ */
+export const MIN_LEAGUE_PLAYERS = 3;
 
 /**
  * Gruppestørrelser for `count` spillere, fra gruppe 1 og nedover, eller null hvis
@@ -12,10 +17,10 @@ export const MIN_PLAYERS = 4;
  * Antall grupper er count / 4 rundet opp, og spillerne fordeles så jevnt som mulig.
  * De største gruppene kommer først: 7 → [4, 3], 10 → [4, 3, 3], 16 → [4, 4, 4, 4].
  * 5 spillere blir én gruppe på 5 med eget oppsett (se planGroupMatches).
- * Færre enn 4 går ikke.
+ * Færre enn `min` (vanligvis 4) går ikke.
  */
-export function groupSizes(count: number): number[] | null {
-  if (count < MIN_PLAYERS || count > MAX_PLAYERS) return null;
+export function groupSizes(count: number, min: number = MIN_PLAYERS): number[] | null {
+  if (count < min || count > MAX_PLAYERS) return null;
   if (count === 5) return [5];
   const groups = Math.ceil(count / 4);
   const small = Math.floor(count / groups);
@@ -35,8 +40,8 @@ export function groupSizeProblem(count: number): string | null {
 }
 
 /** Deler spillere (sortert med best først) i grupper etter `groupSizes`. */
-export function splitIntoGroups<T>(players: T[]): T[][] | null {
-  const sizes = groupSizes(players.length);
+export function splitIntoGroups<T>(players: T[], min: number = MIN_PLAYERS): T[][] | null {
+  const sizes = groupSizes(players.length, min);
   if (!sizes) return null;
   let start = 0;
   return sizes.map((size) => players.slice(start, (start += size)));

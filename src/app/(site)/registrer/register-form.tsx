@@ -4,6 +4,7 @@ import { useActionState } from "react";
 
 import { register } from "@/app/actions/auth";
 import { Field, FormMessage, RadioGroup, SubmitButton } from "@/components/form";
+import { WomensLeagueCheckbox } from "@/components/womens-league-checkbox";
 import { GENDER_LABELS, GENDERS, LEVEL_HINTS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 
 const genderOptions = GENDERS.map((g) => ({ value: g, label: GENDER_LABELS[g] }));
@@ -43,6 +44,10 @@ export function RegisterForm() {
         options={genderOptions}
         defaultValue={values?.gender}
         errors={errors?.gender}
+      />
+      <WomensLeagueCheckbox
+        initialGender={values?.gender}
+        defaultChecked={values?.wantsWomensLeague === "on"}
       />
       <Field
         label="Mobilnummer"

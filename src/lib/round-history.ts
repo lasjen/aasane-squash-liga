@@ -41,6 +41,7 @@ export async function getFinishedRound(roundId: number) {
   const results = await db
     .select({
       playerId: schema.roundResults.playerId,
+      league: schema.roundResults.league,
       firstName: schema.players.firstName,
       lastName: schema.players.lastName,
       position: schema.roundResults.position,
@@ -56,7 +57,7 @@ export async function getFinishedRound(roundId: number) {
     .from(schema.roundResults)
     .innerJoin(schema.players, eq(schema.players.id, schema.roundResults.playerId))
     .where(eq(schema.roundResults.roundId, roundId))
-    .orderBy(asc(schema.roundResults.position));
+    .orderBy(asc(schema.roundResults.league), asc(schema.roundResults.position));
 
   return { ...round, results };
 }

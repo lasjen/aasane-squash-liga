@@ -16,6 +16,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
+import { LEAGUES } from "../lib/leagues";
 import { GENDERS, LEVELS } from "../lib/player-options";
 
 const timestamps = {
@@ -35,6 +36,12 @@ export const playerLevel = pgEnum("player_level", LEVELS);
  */
 export const playerRole = pgEnum("player_role", ["player", "operator", "admin"]);
 
+/**
+ * Ligaene en gruppe, resultatliste eller ranking hører til: «Alle» (open) og dameligaen (women).
+ * Se src/lib/leagues.ts.
+ */
+export const league = pgEnum("league", LEAGUES);
+
 /** Spillere i klubben. Beholdes på tvers av sesonger. */
 export const players = pgTable("players", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -48,6 +55,16 @@ export const players = pgTable("players", {
   level: playerLevel("level"),
   /** Plass i klubbens ranking, 1 er best. Null for spillere som ikke er rangert ennå. */
   ranking: integer("ranking"),
+  /**
+   * Kvinner som vil spille dameliga når det er nok påmeldte (minst 3). Lagres bare som true
+   * for spillere med kjønn kvinne.
+   */
+  wantsWomensLeague: boolean("wants_womens_league").notNull().default(false),
+  /**
+   * Plass i dameligaens ranking, 1 er best. Satt for alle aktive kvinner som vil spille
+   * dameliga, ellers null. Holdes oppdatert av syncWomenRanking i src/lib/women-ranking.ts.
+   */
+  womenRanking: integer("women_ranking"),
   /** scrypt-hash av passordet. Null for spillere som ikke har opprettet innlogging. */
   passwordHash: text("password_hash"),
   /** Se playerRole. Bare admin kan endre roller. */
@@ -97,6 +114,8 @@ export const rankingInfo = pgTable(
     message: text("message"),
     /** Når rekkefølgen i rankingen sist ble endret. */
     rankingUpdatedAt: timestamp("ranking_updated_at", { withTimezone: true }),
+    /** Når rekkefølgen i dameligaens ranking sist ble endret. */
+    womenRankingUpdatedAt: timestamp("women_ranking_updated_at", { withTimezone: true }),
   },
   (t) => [check("ranking_info_single_row_check", sql`${t.id} = 1`)],
 );
@@ -267,7 +286,10 @@ export const matchStatus = pgEnum("match_status", [
   "cancelled", // avlyst
 ]);
 
-/** Gruppene i en runde. Gruppe 1 er øverst (best rangerte spillere). */
+/**
+ * Gruppene i en runde. Gruppe 1 er øverst (best rangerte spillere). Damegruppene nummereres
+ * for seg, så en runde kan ha både gruppe 1 og damegruppe 1.
+ */
 export const roundGroups = pgTable(
   "round_groups",
   {
@@ -275,10 +297,11 @@ export const roundGroups = pgTable(
     roundId: integer("round_id")
       .notNull()
       .references(() => rounds.id, { onDelete: "cascade" }),
+    league: league("league").notNull().default("open"),
     number: smallint("number").notNull(),
   },
   (t) => [
-    unique("round_groups_round_number_unique").on(t.roundId, t.number),
+    unique("round_groups_round_league_number_unique").on(t.roundId, t.league, t.number),
     // Trengs for den sammensatte fremmednøkkelen fra round_group_players.
     unique("round_groups_id_round_unique").on(t.id, t.roundId),
     check("round_groups_number_check", sql`${t.number} >= 1`),
@@ -308,7 +331,8 @@ export const roundGroupPlayers = pgTable(
 
 /**
  * Resultatlisten for en avsluttet runde: én rad per deltaker, i endelig rekkefølge
- * på tvers av gruppene, med ranking før og etter runden.
+ * på tvers av gruppene, med ranking før og etter runden. Dameligaen har sin egen liste
+ * (league = women), og rankingen der er dameligaens ranking.
  */
 export const roundResults = pgTable(
   "round_results",
@@ -319,7 +343,8 @@ export const roundResults = pgTable(
     playerId: integer("player_id")
       .notNull()
       .references(() => players.id, { onDelete: "cascade" }),
-    /** Plass i resultatlisten, fra 1. */
+    league: league("league").notNull().default("open"),
+    /** Plass i resultatlisten for ligaen, fra 1. */
     position: smallint("position").notNull(),
     groupNumber: smallint("group_number").notNull(),
     /** Plass i egen gruppe, fra 1. */
@@ -333,13 +358,14 @@ export const roundResults = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.roundId, t.playerId] }),
-    unique("round_results_round_position_unique").on(t.roundId, t.position),
+    unique("round_results_round_league_position_unique").on(t.roundId, t.league, t.position),
   ],
 );
 
 /**
- * Rankingen slik den var før runden, for alle aktive rangerte spillere. Lagres når runden
- * avsluttes, så resultatlisten og ny ranking kan regnes ut på nytt hvis et resultat rettes.
+ * Rankingen slik den var før runden, for alle aktive rangerte spillere, både i «Alle» og i
+ * dameligaen. Lagres når runden avsluttes, så resultatlisten og ny ranking kan regnes ut
+ * på nytt hvis et resultat rettes.
  */
 export const roundRankingSnapshots = pgTable(
   "round_ranking_snapshots",
@@ -347,12 +373,13 @@ export const roundRankingSnapshots = pgTable(
     roundId: integer("round_id")
       .notNull()
       .references(() => rounds.id, { onDelete: "cascade" }),
+    league: league("league").notNull().default("open"),
     playerId: integer("player_id")
       .notNull()
       .references(() => players.id, { onDelete: "cascade" }),
     ranking: integer("ranking").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.roundId, t.playerId] })],
+  (t) => [primaryKey({ columns: [t.roundId, t.league, t.playerId] })],
 );
 
 /** Om en spiller i en kamp er vinneren eller taperen fra en tidligere kamp. */

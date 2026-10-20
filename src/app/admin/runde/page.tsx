@@ -27,6 +27,7 @@ import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { formatRoundDate, osloToday } from "@/lib/dates";
 import { MAX_PLAYERS, groupSizeProblem } from "@/lib/groups";
+import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
 import { BEST_OF_OPTIONS, DEFAULT_BEST_OF } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
 import { findAdminRound, getGroups, getSignups, getUpcomingCancellations } from "@/lib/rounds";
@@ -274,7 +275,11 @@ async function OpenRound({ date, roundId }: { date: string; roundId: number | nu
   const participants = signups.slice(0, MAX_PLAYERS);
   const waitlist = signups.slice(MAX_PLAYERS);
   const others = await activePlayersExcept(new Set(signups.map((s) => s.playerId)));
-  const problem = groupSizeProblem(participants.length);
+  const { women } = splitLeagues(participants);
+  const wantWomen = participants.filter(isWomensLeagueMember).length;
+  const inWomensLeague = new Set(women.map((p) => p.playerId));
+  // Med dameliga holder 3 spillere i hver liga, så regelen for antall gjelder bare uten.
+  const problem = women.length > 0 ? null : groupSizeProblem(participants.length);
 
   return (
     <>
@@ -293,9 +298,25 @@ async function OpenRound({ date, roundId }: { date: string; roundId: number | nu
         {problem && <p className="text-sm text-zinc-600 dark:text-zinc-400">{problem}</p>}
       </div>
 
+      {wantWomen > 0 && (
+        <p className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+          {women.length > 0
+            ? `Dameliga denne runden: ${women.length} kvinner spiller i egne damegrupper og beholder plassen sin i «Alle». De andre ${participants.length - women.length} spiller i «Alle».`
+            : wantWomen < MIN_WOMENS_LEAGUE_PLAYERS
+              ? `${wantWomen} ${wantWomen === 1 ? "påmeldt kvinne ønsker" : "påmeldte kvinner ønsker"} dameliga. Det trengs minst ${MIN_WOMENS_LEAGUE_PLAYERS}, så alle spiller i «Alle» denne runden.`
+              : `${wantWomen} påmeldte kvinner ønsker dameliga, men da blir det bare ${participants.length - wantWomen} igjen i «Alle». Det trengs minst ${MIN_WOMENS_LEAGUE_PLAYERS}, så alle spiller i «Alle» denne runden.`}
+        </p>
+      )}
+
       <PlayerSection title={`Påmeldte (${participants.length}/${MAX_PLAYERS})`} empty="Ingen har meldt seg på ennå.">
         {participants.map((p, i) => (
-          <PlayerRow key={p.playerId} index={i + 1} name={`${p.firstName} ${p.lastName}`} ranking={p.ranking}>
+          <PlayerRow
+            key={p.playerId}
+            index={i + 1}
+            name={`${p.firstName} ${p.lastName}`}
+            ranking={p.ranking}
+            tag={inWomensLeague.has(p.playerId) ? "dameliga" : undefined}
+          >
             <form action={removeFromRound.bind(null, roundId!, p.playerId, false)}>
               <PendingButton pendingText="Fjerner …" className={removeButton}>
                 Fjern
@@ -356,6 +377,7 @@ async function StartedRound({
     getRoundMatches(roundId),
   ]);
   const inGroup = new Set(groups.flatMap((g) => g.players.map((p) => p.id)));
+  const hasWomen = groups.some((g) => g.league === "women");
   const missing = matches.filter((m) => m.player1Games === null).length;
   const unconfirmed = matches.filter((m) => m.awaitingConfirmation).length;
   // Påmeldte som ikke er i en gruppe, f.eks. fra ventelisten.
@@ -420,106 +442,115 @@ async function StartedRound({
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {groups.map((group) => {
-          const size = group.players.length;
-          return (
-            <section
-              key={group.id}
-              className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
-            >
-              <h2 className="flex items-baseline justify-between font-semibold">
-                Gruppe {group.number}
-                <span
-                  className={`text-sm font-normal ${size < 3 || size > 4 ? "text-amber-700 dark:text-amber-400" : "text-zinc-500"}`}
+      {LEAGUES.filter((league) => groups.some((g) => g.league === league)).map((league) => (
+        <section key={league} className="flex flex-col gap-3">
+          {hasWomen && (
+            <h2 className="text-lg font-semibold tracking-tight">
+              {league === "women" ? "Dameliga" : "Alle"}
+            </h2>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {groups.filter((g) => g.league === league).map((group) => {
+              const size = group.players.length;
+              return (
+                <section
+                  key={group.id}
+                  className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
                 >
-                  {size} spillere
-                </span>
-              </h2>
-              <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
-                {group.players.map((p) => (
-                  <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-                    <span className="w-7 text-right text-sm tabular-nums text-zinc-500">{p.ranking ?? "–"}</span>
-                    <span className="flex-1">
-                      {p.firstName} {p.lastName}
+                  <h3 className="flex items-baseline justify-between font-semibold">
+                    {group.label}
+                    <span
+                      className={`text-sm font-normal ${size < 3 || size > 4 ? "text-amber-700 dark:text-amber-400" : "text-zinc-500"}`}
+                    >
+                      {size} spillere
                     </span>
-                    {editing && (
-                      <>
-                        <form action={movePlayer.bind(null, roundId, p.id)} className="flex items-center gap-1.5">
-                          <label className="sr-only" htmlFor={`flytt-${p.id}`}>
-                            Flytt {p.firstName} til gruppe
-                          </label>
-                          <select
-                            id={`flytt-${p.id}`}
-                            name="group"
-                            defaultValue={group.number}
-                            className="rounded-md border border-zinc-300 bg-white px-1.5 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                          >
-                            {groups.map((g) => (
-                              <option key={g.id} value={g.number}>
-                                Gruppe {g.number}
-                              </option>
-                            ))}
-                          </select>
-                          <PendingButton pendingText="Flytter …" className={smallButton}>
-                            Flytt
-                          </PendingButton>
-                        </form>
-                        <form action={removeFromRound.bind(null, roundId, p.id, true)}>
-                          <PendingButton pendingText="Fjerner …" className={removeButton}>
-                            Fjern
-                          </PendingButton>
-                        </form>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <ol className="mt-1 divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-                {matches
-                  .filter((m) => m.groupId === group.id)
-                  .map((m) => (
-                    <AdminMatch
-                      key={m.id}
-                      match={m}
-                      bestOf={bestOf}
-                      saveAction={adminSaveResult.bind(null, m.id)}
-                    />
-                  ))}
-              </ol>
-              {editing && candidates.length > 0 && (
-                <form
-                  action={addToGroup.bind(null, roundId, group.id)}
-                  className="mt-1 flex items-center gap-1.5 border-t border-zinc-200 pt-2 dark:border-zinc-800"
-                >
-                  <label className="sr-only" htmlFor={`legg-til-${group.id}`}>
-                    Legg til spiller i gruppe {group.number}
-                  </label>
-                  <select
-                    id={`legg-til-${group.id}`}
-                    name="playerId"
-                    defaultValue=""
-                    className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-1.5 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                  >
-                    <option value="" disabled>
-                      Velg spiller …
-                    </option>
-                    {candidates.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.firstName} {c.lastName}
-                        {waiting.some((w) => w.playerId === c.id) ? " (venteliste)" : ""}
-                      </option>
+                  </h3>
+                  <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {group.players.map((p) => (
+                      <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+                        <span className="w-7 text-right text-sm tabular-nums text-zinc-500">{p.ranking ?? "–"}</span>
+                        <span className="flex-1">
+                          {p.firstName} {p.lastName}
+                        </span>
+                        {editing && (
+                          <>
+                            <form action={movePlayer.bind(null, roundId, p.id)} className="flex items-center gap-1.5">
+                              <label className="sr-only" htmlFor={`flytt-${p.id}`}>
+                                Flytt {p.firstName} til gruppe
+                              </label>
+                              <select
+                                id={`flytt-${p.id}`}
+                                name="group"
+                                defaultValue={group.id}
+                                className="rounded-md border border-zinc-300 bg-white px-1.5 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                              >
+                                {groups.map((g) => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <PendingButton pendingText="Flytter …" className={smallButton}>
+                                Flytt
+                              </PendingButton>
+                            </form>
+                            <form action={removeFromRound.bind(null, roundId, p.id, true)}>
+                              <PendingButton pendingText="Fjerner …" className={removeButton}>
+                                Fjern
+                              </PendingButton>
+                            </form>
+                          </>
+                        )}
+                      </li>
                     ))}
-                  </select>
-                  <PendingButton pendingText="Legger til …" className={smallButton}>
-                    Legg til
-                  </PendingButton>
-                </form>
-              )}
-            </section>
-          );
-        })}
-      </div>
+                  </ul>
+                  <ol className="mt-1 divide-y divide-zinc-200 border-t border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+                    {matches
+                      .filter((m) => m.groupId === group.id)
+                      .map((m) => (
+                        <AdminMatch
+                          key={m.id}
+                          match={m}
+                          bestOf={bestOf}
+                          saveAction={adminSaveResult.bind(null, m.id)}
+                        />
+                      ))}
+                  </ol>
+                  {editing && candidates.length > 0 && (
+                    <form
+                      action={addToGroup.bind(null, roundId, group.id)}
+                      className="mt-1 flex items-center gap-1.5 border-t border-zinc-200 pt-2 dark:border-zinc-800"
+                    >
+                      <label className="sr-only" htmlFor={`legg-til-${group.id}`}>
+                        Legg til spiller i {group.label.toLowerCase()}
+                      </label>
+                      <select
+                        id={`legg-til-${group.id}`}
+                        name="playerId"
+                        defaultValue=""
+                        className="min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-1.5 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      >
+                        <option value="" disabled>
+                          Velg spiller …
+                        </option>
+                        {candidates.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.firstName} {c.lastName}
+                            {waiting.some((w) => w.playerId === c.id) ? " (venteliste)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <PendingButton pendingText="Legger til …" className={smallButton}>
+                        Legg til
+                      </PendingButton>
+                    </form>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {waiting.length > 0 && (
         <PlayerSection
@@ -571,17 +602,27 @@ function PlayerRow({
   index,
   name,
   ranking,
+  tag,
   children,
 }: {
   index?: number;
   name: string;
   ranking: number | null;
+  /** Liten merkelapp etter navnet, f.eks. «dameliga». */
+  tag?: string;
   children: ReactNode;
 }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2">
       {index !== undefined && <span className="w-6 text-right text-sm tabular-nums text-zinc-500">{index}.</span>}
-      <span className="flex-1">{name}</span>
+      <span className="flex-1">
+        {name}
+        {tag && (
+          <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            {tag}
+          </span>
+        )}
+      </span>
       <span className="text-sm tabular-nums text-zinc-500">{ranking ? `#${ranking}` : "Ikke rangert"}</span>
       {children}
     </li>

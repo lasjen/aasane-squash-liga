@@ -10,7 +10,8 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Setter opp kampene i en gruppe på nytt ut fra hvem som er i gruppen nå.
- * Spillerne nummereres etter ranking (beste først, uten ranking sist).
+ * Spillerne nummereres etter ranking (beste først, uten ranking sist). I damegrupper er det
+ * dameligaens ranking som gjelder, med «Alle»-rankingen som reserve.
  * Brukes når runden startes eller restartes, og når admin endrer gruppen.
  */
 export async function regenerateGroupMatches(tx: Transaction, roundId: number, groupId: number) {
@@ -20,8 +21,10 @@ export async function regenerateGroupMatches(tx: Transaction, roundId: number, g
     .select({ id: schema.players.id })
     .from(schema.roundGroupPlayers)
     .innerJoin(schema.players, eq(schema.players.id, schema.roundGroupPlayers.playerId))
+    .innerJoin(schema.roundGroups, eq(schema.roundGroups.id, schema.roundGroupPlayers.groupId))
     .where(eq(schema.roundGroupPlayers.groupId, groupId))
     .orderBy(
+      sql`case when ${schema.roundGroups.league} = 'women' then ${schema.players.womenRanking} end asc nulls last`,
       sql`${schema.players.ranking} asc nulls last`,
       asc(schema.players.lastName),
       asc(schema.players.firstName),

@@ -6,6 +6,7 @@ import * as z from "zod";
 
 import { db, schema } from "@/db";
 import { logAction } from "@/lib/audit";
+import { LEAGUES, type League } from "@/lib/leagues";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { rankingMoves, sameRankingMembers } from "@/lib/ranking";
 import { RANKING_MESSAGE_MAX, touchRanking } from "@/lib/ranking-info";
@@ -29,8 +30,14 @@ const LOG_LIMIT = 10;
  * avvises publiseringen, så ingen overskriver andres endringer uten å vite det.
  * `order` må inneholde nøyaktig de samme spillerne; nye plasser gis fra 1 og nedover.
  */
-export async function publishRanking(expected: number[], order: number[]): Promise<PublishRankingResult> {
+export async function publishRanking(
+  league: League,
+  expected: number[],
+  order: number[],
+): Promise<PublishRankingResult> {
   const actor = await requireOperator();
+  if (!LEAGUES.includes(league)) return { ok: false, stale: false, message: "Ukjent ranking." };
+  const column = league === "women" ? schema.players.womenRanking : schema.players.ranking;
 
   const parsedExpected = idList.safeParse(expected);
   const parsedOrder = idList.safeParse(order);
@@ -47,8 +54,8 @@ export async function publishRanking(expected: number[], order: number[]): Promi
         lastName: schema.players.lastName,
       })
       .from(schema.players)
-      .where(and(eq(schema.players.active, true), isNotNull(schema.players.ranking)))
-      .orderBy(asc(schema.players.ranking), asc(schema.players.id))
+      .where(and(eq(schema.players.active, true), isNotNull(column)))
+      .orderBy(asc(column), asc(schema.players.id))
       .for("update");
     const currentIds = current.map((p) => p.id);
 
@@ -65,11 +72,11 @@ export async function publishRanking(expected: number[], order: number[]): Promi
     // Én spørring: hver spiller får plassen sin i den nye rekkefølgen.
     await tx.execute(sql`
       UPDATE ${schema.players} AS p
-      SET ranking = v.ranking
+      SET ${sql.raw(league === "women" ? "women_ranking" : "ranking")} = v.ranking
       FROM unnest(${sql.param(parsedOrder.data)}::int[]) WITH ORDINALITY AS v(id, ranking)
       WHERE p.id = v.id
     `);
-    await touchRanking(tx);
+    await touchRanking(tx, league);
 
     // Loggen viser spillerne som er flyttet mer enn én plass. De som bare rykket én plass
     // fordi noen ble flyttet forbi dem, telles. Er alle flyttet én plass (f.eks. to naboer
@@ -83,8 +90,8 @@ export async function publishRanking(expected: number[], order: number[]): Promi
     const rest = moves.length - Math.min(shown.length, LOG_LIMIT);
     await logAction(
       actor,
-      "ranking.endret",
-      `Endret rankingen manuelt: ${listed.join(", ")}${
+      league === "women" ? "ranking.dame-endret" : "ranking.endret",
+      `Endret ${league === "women" ? "dameligaens ranking" : "rankingen"} manuelt: ${listed.join(", ")}${
         rest > 0 ? ` (${rest} ${rest === 1 ? "annen spiller" : "andre spillere"} flyttet)` : ""
       }`,
       tx,

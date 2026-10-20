@@ -16,8 +16,10 @@ import {
   type DeleteAccountField,
   type FormState,
   type ProfileField,
+  womensLeagueFor,
 } from "@/lib/auth/validation";
 import { anonymizePlayer, isInRunningRound, isLastAdmin } from "@/lib/players/delete-player";
+import { syncWomenRanking } from "@/lib/women-ranking";
 
 /** Som FormState, men med `saved` når lagringen gikk bra. */
 export type SettingsState<TField extends string> =
@@ -44,14 +46,22 @@ export async function updateProfile(
     level: text(formData, "level"),
     email: text(formData, "email"),
     phone: text(formData, "phone"),
+    wantsWomensLeague: text(formData, "wantsWomensLeague"),
   };
   const parsed = profileSchema.safeParse(values);
   if (!parsed.success) {
     return { errors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
+  const profile = {
+    ...parsed.data,
+    wantsWomensLeague: womensLeagueFor(parsed.data.gender, parsed.data.wantsWomensLeague),
+  };
   try {
-    await db.update(schema.players).set(parsed.data).where(eq(schema.players.id, player.id));
+    await db.transaction(async (tx) => {
+      await tx.update(schema.players).set(profile).where(eq(schema.players.id, player.id));
+      await syncWomenRanking(tx);
+    });
   } catch (err) {
     if (isUniqueViolation(err)) {
       return { errors: { email: ["En annen spiller bruker allerede denne e-postadressen."] }, values };
