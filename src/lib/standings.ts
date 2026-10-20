@@ -154,3 +154,17 @@ export function newRanking(ranked: number[], results: number[]): number[] {
   const queue = [...results];
   return slots.map((id) => id ?? queue.shift()!);
 }
+
+/**
+ * Som newRanking, men spillerne i `kept` beholder plassen sin. Brukes for kvinner som spilte
+ * dameliga i runden: de rykker verken opp eller ned i «Alle», og de andre fordeles rundt dem.
+ */
+export function newRankingKeeping(ranked: number[], results: number[], kept: Set<number>): number[] {
+  const fixed = ranked.flatMap((id, index) => (kept.has(id) ? [{ id, index }] : []));
+  const order = newRanking(
+    ranked.filter((id) => !kept.has(id)),
+    results.filter((id) => !kept.has(id)),
+  );
+  for (const { id, index } of fixed) order.splice(Math.min(index, order.length), 0, id);
+  return order;
+}

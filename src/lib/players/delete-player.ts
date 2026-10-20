@@ -4,6 +4,7 @@ import { and, eq, gt, isNull, ne, sql } from "drizzle-orm";
 
 import { db, schema } from "@/db";
 import { touchRanking } from "@/lib/ranking-info";
+import { syncWomenRanking } from "@/lib/women-ranking";
 
 export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -85,7 +86,9 @@ export async function anonymizePlayer(tx: Transaction, playerId: number) {
       active: false,
       isMember: false,
       ranking: null,
+      wantsWomensLeague: false,
       deletedAt: new Date(),
     })
     .where(eq(schema.players.id, playerId));
+  await syncWomenRanking(tx);
 }

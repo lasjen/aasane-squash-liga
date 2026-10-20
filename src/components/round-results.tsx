@@ -4,6 +4,7 @@ import { adminCorrectResult } from "@/app/actions/results";
 import { AdminMatch } from "@/components/admin-match";
 import { MatchList } from "@/components/match-list";
 import { formatRoundDate } from "@/lib/dates";
+import { LEAGUES } from "@/lib/leagues";
 import { getFinishedRound, getFinishedRounds } from "@/lib/round-history";
 import { getRoundMatches } from "@/lib/round-matches";
 import { getGroups } from "@/lib/rounds";
@@ -83,62 +84,33 @@ export async function RoundResults({
         </h1>
       </div>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="font-semibold">Resultatliste</h2>
-        {round.results.length === 0 ? (
+      {round.results.length === 0 ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="font-semibold">Resultatliste</h2>
           <p className="text-zinc-600 dark:text-zinc-400">
             Resultatlisten er ikke laget for denne runden.
           </p>
-        ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
-              <tr>
-                <th className="px-3 py-2 text-right font-medium">#</th>
-                <th className="px-3 py-2 font-medium">Navn</th>
-                <th className="px-3 py-2 font-medium">Gruppe</th>
-                <th className="px-3 py-2 font-medium">Kamper</th>
-                <th className="px-3 py-2 font-medium">Sett</th>
-                <th className="px-3 py-2 font-medium">Ranking</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {round.results.map((r) => (
-                <tr key={r.playerId} className={r.playerId === highlight ? "bg-zinc-100 font-medium dark:bg-zinc-900" : undefined}>
-                  <td className="px-3 py-2 text-right tabular-nums">{r.position}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {r.firstName} {r.lastName}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-zinc-600 dark:text-zinc-400">
-                    {r.groupNumber} ({r.groupPosition}. plass)
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {r.wins}–{r.losses}
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {r.setsWon}–{r.setsLost}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <RankingChange before={r.rankingBefore} after={r.rankingAfter} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        )}
-        <p className="text-sm text-zinc-500">
-          Vinneren av hver gruppe rykker opp forbi sistemann i gruppen over. Spillere som ikke var
-          med, rykket 2 plasser ned i rankingen.
-        </p>
-      </section>
+        </section>
+      ) : (
+        LEAGUES.filter((league) => round.results.some((r) => r.league === league)).map((league) => (
+          <section key={league} className="flex flex-col gap-2">
+            <h2 className="font-semibold">{league === "women" ? "Resultatliste dameliga" : "Resultatliste"}</h2>
+            <ResultTable results={round.results.filter((r) => r.league === league)} highlight={highlight} />
+            <p className="text-sm text-zinc-500">
+              {league === "women"
+                ? "Rankingen her er dameligaens ranking. Kvinnene som spilte dameliga, beholdt plassen sin i «Alle»."
+                : "Vinneren av hver gruppe rykker opp forbi sistemann i gruppen over. Spillere som ikke var med, rykket 2 plasser ned i rankingen."}
+            </p>
+          </section>
+        ))
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="font-semibold">Kamper</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {groups.map((group) => (
             <div key={group.id} className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-              <h3 className="font-medium">Gruppe {group.number}</h3>
+              <h3 className="font-medium">{group.label}</h3>
               {adminEditable ? (
                 <ol className="divide-y divide-zinc-200 dark:divide-zinc-800">
                   {matches
@@ -160,5 +132,48 @@ export async function RoundResults({
         </div>
       </section>
     </>
+  );
+}
+
+type ResultRow = NonNullable<Awaited<ReturnType<typeof getFinishedRound>>>["results"][number];
+
+function ResultTable({ results, highlight }: { results: ResultRow[]; highlight?: number }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-zinc-50 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+          <tr>
+            <th className="px-3 py-2 text-right font-medium">#</th>
+            <th className="px-3 py-2 font-medium">Navn</th>
+            <th className="px-3 py-2 font-medium">Gruppe</th>
+            <th className="px-3 py-2 font-medium">Kamper</th>
+            <th className="px-3 py-2 font-medium">Sett</th>
+            <th className="px-3 py-2 font-medium">Ranking</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {results.map((r) => (
+            <tr key={r.playerId} className={r.playerId === highlight ? "bg-zinc-100 font-medium dark:bg-zinc-900" : undefined}>
+              <td className="px-3 py-2 text-right tabular-nums">{r.position}</td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {r.firstName} {r.lastName}
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap text-zinc-600 dark:text-zinc-400">
+                {r.groupNumber} ({r.groupPosition}. plass)
+              </td>
+              <td className="px-3 py-2 tabular-nums">
+                {r.wins}–{r.losses}
+              </td>
+              <td className="px-3 py-2 tabular-nums">
+                {r.setsWon}–{r.setsLost}
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <RankingChange before={r.rankingBefore} after={r.rankingAfter} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

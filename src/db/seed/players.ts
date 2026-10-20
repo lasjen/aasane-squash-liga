@@ -8,13 +8,13 @@ export const TEST_PASSWORD = "squash123";
 /** Fiktive testspillere. E-postadressene bruker example.com, som aldri leverer e-post. */
 export const testPlayers: NewPlayer[] = [
   { firstName: "Ola", lastName: "Nordmann", gender: "male", level: "beginner", email: "ola.nordmann@example.com", phone: "40000001", role: "admin" },
-  { firstName: "Kari", lastName: "Nordmann", gender: "female", level: "intermediate", email: "kari.nordmann@example.com", phone: "40000002" },
+  { firstName: "Kari", lastName: "Nordmann", gender: "female", level: "intermediate", wantsWomensLeague: true, email: "kari.nordmann@example.com", phone: "40000002" },
   { firstName: "Lars", lastName: "Hansen", gender: "male", level: "experienced", email: "lars.hansen@example.com", phone: "40000003" },
-  { firstName: "Ingrid", lastName: "Johansen", gender: "female", level: "pro", email: "ingrid.johansen@example.com", phone: "40000004" },
+  { firstName: "Ingrid", lastName: "Johansen", gender: "female", level: "pro", wantsWomensLeague: true, email: "ingrid.johansen@example.com", phone: "40000004" },
   { firstName: "Erik", lastName: "Olsen", gender: "male", level: "beginner", email: "erik.olsen@example.com", phone: "40000005" },
-  { firstName: "Marte", lastName: "Larsen", gender: "female", level: "intermediate", email: "marte.larsen@example.com", phone: "40000006" },
+  { firstName: "Marte", lastName: "Larsen", gender: "female", level: "intermediate", wantsWomensLeague: true, email: "marte.larsen@example.com", phone: "40000006" },
   { firstName: "Henrik", lastName: "Andersen", gender: "male", level: "experienced", email: "henrik.andersen@example.com", phone: "40000007" },
-  { firstName: "Sofie", lastName: "Pedersen", gender: "female", level: "pro", email: "sofie.pedersen@example.com", phone: "40000008" },
+  { firstName: "Sofie", lastName: "Pedersen", gender: "female", level: "pro", wantsWomensLeague: true, email: "sofie.pedersen@example.com", phone: "40000008" },
   { firstName: "Magnus", lastName: "Nilsen", gender: "male", level: "beginner", email: "magnus.nilsen@example.com", phone: "40000009" },
   { firstName: "Nora", lastName: "Kristiansen", gender: "female", level: "intermediate", email: "nora.kristiansen@example.com", phone: "40000010" },
   { firstName: "Jonas", lastName: "Jensen", gender: "male", level: "experienced", email: "jonas.jensen@example.com", phone: "40000011" },

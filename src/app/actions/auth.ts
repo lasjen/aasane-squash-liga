@@ -13,8 +13,10 @@ import {
   type FormState,
   type LoginField,
   type RegisterField,
+  womensLeagueFor,
 } from "@/lib/auth/validation";
 import { playerHomePath } from "@/lib/rounds";
+import { syncWomenRanking } from "@/lib/women-ranking";
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "");
 
@@ -34,6 +36,7 @@ export async function register(
     level: text(formData, "level"),
     email: text(formData, "email"),
     phone: text(formData, "phone"),
+    wantsWomensLeague: text(formData, "wantsWomensLeague"),
   };
   const parsed = registerSchema.safeParse({
     ...values,
@@ -44,22 +47,27 @@ export async function register(
     return { errors: z.flattenError(parsed.error).fieldErrors, values };
   }
 
-  const { firstName, lastName, gender, level, email, phone, password } = parsed.data;
+  const { firstName, lastName, gender, level, email, phone, password, wantsWomensLeague } = parsed.data;
+  const passwordHash = await hashPassword(password);
   let playerId: number;
   try {
-    const [player] = await db
-      .insert(schema.players)
-      .values({
-        firstName,
-        lastName,
-        gender,
-        level,
-        email,
-        phone,
-        passwordHash: await hashPassword(password),
-      })
-      .returning({ id: schema.players.id });
-    playerId = player.id;
+    playerId = await db.transaction(async (tx) => {
+      const [player] = await tx
+        .insert(schema.players)
+        .values({
+          firstName,
+          lastName,
+          gender,
+          level,
+          email,
+          phone,
+          wantsWomensLeague: womensLeagueFor(gender, wantsWomensLeague),
+          passwordHash,
+        })
+        .returning({ id: schema.players.id });
+      await syncWomenRanking(tx);
+      return player.id;
+    });
   } catch (err) {
     if (isUniqueViolation(err)) {
       return {

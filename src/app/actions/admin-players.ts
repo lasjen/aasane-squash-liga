@@ -9,7 +9,7 @@ import { adminPlayerSchema, type AdminPlayerField } from "@/lib/admin/player-val
 import { logAction } from "@/lib/audit";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { hashPassword } from "@/lib/auth/password";
-import type { FormState } from "@/lib/auth/validation";
+import { womensLeagueFor, type FormState } from "@/lib/auth/validation";
 import {
   anonymizePlayer,
   isInRunningRound,
@@ -20,6 +20,7 @@ import {
 import { buildRanking } from "@/lib/ranking";
 import { touchRanking } from "@/lib/ranking-info";
 import { isOperatorRole, ROLE_LABELS, type Role } from "@/lib/roles";
+import { syncWomenRanking } from "@/lib/women-ranking";
 
 type PlayerFormState = FormState<AdminPlayerField>;
 
@@ -41,6 +42,7 @@ function parsePlayerForm(formData: FormData) {
     phone: text(formData, "phone"),
     active: formData.get("active") === "on" ? "on" : "",
     isMember: formData.get("isMember") === "on" ? "on" : "",
+    wantsWomensLeague: formData.get("wantsWomensLeague") === "on" ? "on" : "",
     // Rollefeltet vises bare for admins. Mangler det, endres ikke rollen.
     role: text(formData, "role"),
   };
@@ -49,8 +51,12 @@ function parsePlayerForm(formData: FormData) {
     password: text(formData, "password"),
     active: values.active === "on",
     isMember: values.isMember === "on",
+    wantsWomensLeague: values.wantsWomensLeague === "on",
     role: values.role || undefined,
   });
+  if (parsed.success) {
+    parsed.data.wantsWomensLeague = womensLeagueFor(parsed.data.gender, parsed.data.wantsWomensLeague);
+  }
   return { values, parsed };
 }
 
@@ -95,6 +101,7 @@ export async function createPlayer(_prev: PlayerFormState, formData: FormData): 
         role: newRole,
         passwordHash: password ? await hashPassword(password) : null,
       });
+      await syncWomenRanking(tx);
       await logAction(
         actor,
         "spiller.lagt-til",
@@ -167,6 +174,7 @@ export async function updatePlayer(
           ...(password && { passwordHash: await hashPassword(password) }),
         })
         .where(eq(schema.players.id, playerId));
+      await syncWomenRanking(tx);
 
       if (!isOperatorRole(newRole) || !player.active) {
         await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
@@ -180,6 +188,9 @@ export async function updatePlayer(
       if (before.active !== player.active) changed.push(player.active ? "aktivert" : "deaktivert");
       if (before.isMember !== player.isMember) {
         changed.push(player.isMember ? "merket som medlem" : "merket som ikke medlem");
+      }
+      if (before.wantsWomensLeague !== player.wantsWomensLeague) {
+        changed.push(player.wantsWomensLeague ? "med i dameliga" : "ikke med i dameliga");
       }
       const name = fullName(before);
       if (changed.length > 0) {
@@ -222,6 +233,7 @@ export async function deactivatePlayer(playerId: number) {
     if (protectedFrom(actor, target)) return "kun-admin";
     await removeFromRanking(tx, playerId);
     await tx.update(schema.players).set({ active: false }).where(eq(schema.players.id, playerId));
+    await syncWomenRanking(tx);
     // Inaktive spillere kan ikke være innlogget i konsollen.
     await tx.delete(schema.adminSessions).where(eq(schema.adminSessions.playerId, playerId));
     await logAction(actor, "spiller.deaktivert", `Deaktiverte ${fullName(target)}`, tx);
@@ -239,6 +251,7 @@ export async function activatePlayer(playerId: number) {
     const target = await loadPlayer(tx, playerId);
     if (!target) return;
     await tx.update(schema.players).set({ active: true }).where(eq(schema.players.id, playerId));
+    await syncWomenRanking(tx);
     await logAction(actor, "spiller.aktivert", `Aktiverte ${fullName(target)}`, tx);
   });
   redirect("/admin?melding=aktivert");
@@ -301,6 +314,7 @@ export async function updateRanking() {
       .update(schema.players)
       .set({ ranking: null })
       .where(eq(schema.players.active, false));
+    await syncWomenRanking(tx);
 
     await touchRanking(tx);
     const newlyRanked = players.filter((p) => p.ranking === null).length;

@@ -41,10 +41,10 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `rounds`           | Kampkvelder (torsdager) i en sesong, med status                |
 | `round_signups`    | Hvem som har meldt seg på en runde                             |
 | `cancelled_dates`  | Torsdager uten liga, med valgfri melding til spillerne         |
-| `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst                   |
+| `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst, per liga         |
 | `round_group_players` | Hvilken gruppe hver spiller er i                            |
-| `round_results`    | Resultatliste for avsluttede runder, med ranking før og etter  |
-| `round_ranking_snapshots` | Hele rankingen slik den var før runden ble avsluttet    |
+| `round_results`    | Resultatliste per liga for avsluttede runder, med ranking før og etter |
+| `round_ranking_snapshots` | Rankingene (Alle og dameliga) slik de var før runden ble avsluttet |
 | `matches`          | Kamper i en gruppe, med status og vinner                       |
 | `match_games`      | Poeng per game i en kamp (best av fem)                         |
 | `sessions`         | Innloggingsøkter (lagrer bare en hash av tokenet)              |
@@ -108,7 +108,8 @@ e-post og passord.
 
 Registreringen lagrer fornavn, etternavn, kjønn, mobil, e-post (brukes som
 brukernavn), passord og nivå. Valgene for kjønn og nivå ligger i
-`src/lib/player-options.ts`.
+`src/lib/player-options.ts`. Velger man «Kvinne», vises sjekkboksen «Ønsker å
+spille dameliga (hvis nok spillere)» (se Dameliga under).
 
 ### Roller: operatør og admin
 
@@ -272,6 +273,33 @@ rankingen er endret siden siden ble åpnet (f.eks. av en annen operatør eller
 fordi en runde ble avsluttet), og endringen loggføres. Merk at retting av
 resultater i den sist avsluttede runden regner rankingen ut på nytt og
 overskriver manuelle endringer gjort etter den runden.
+
+### Dameliga
+
+Kvinner kan krysse av for «Ønsker å spille dameliga (hvis nok spillere)» ved
+registrering, under Innstillinger, eller admin kan gjøre det i spillerskjemaet.
+Sjekkboksen vises bare når kjønn er «Kvinne», og lagres bare for kvinner
+(`players.wants_womens_league`). Logikken ligger i `src/lib/leagues.ts`.
+
+- **To rankinger.** `players.ranking` er «Alle», der alle aktive spillere er med.
+  `players.women_ranking` er dameligaens ranking, for aktive kvinner som har krysset av.
+  Den holdes automatisk i takt med hvem som er med (`syncWomenRanking` i
+  `src/lib/women-ranking.ts`): de som har plass, beholder rekkefølgen, nye legges nederst
+  i samme innbyrdes rekkefølge som i «Alle».
+- **Gruppene.** Når runden startes og minst 3 av deltakerne er med i dameligaen, får de
+  egne damegrupper (`round_groups.league = 'women'`), sortert etter dameligaens ranking.
+  Resten spiller i «Alle». Med dameliga holder 3 spillere i hver liga (én gruppe på 3).
+  Blir det 1 eller 2 igjen i «Alle», spiller alle i «Alle» som før. Damegruppene
+  nummereres for seg («Damegruppe 1»), og admin kan flytte spillere mellom alle gruppene
+  under Edit.
+- **Ranking etter runden.** Hver liga får sin egen resultatliste og ranking etter de
+  vanlige reglene. Kvinnene som spilte i damegruppene, beholder nøyaktig plassen sin i
+  «Alle» (`newRankingKeeping` i `src/lib/standings.ts`); de andre fordeles rundt dem.
+  Dameligaens ranking endres bare i runder med damegrupper, og da rykker medlemmer som
+  ikke var med, 2 plasser ned der.
+- **Visning.** Fanen «Ranking» har underfanene «Alle» og «Kvinner» (`?liga=kvinner`), både
+  for spillere og på `/admin/ranking`, der begge kan endres for hånd. Underfanen vises for
+  spillere når noen er med i dameligaen.
 
 Prosjektet bruker Cache Components, så komponenter som leser innloggingen
 må ligge inni `<Suspense>`.

@@ -73,7 +73,7 @@ async function League() {
           {formatRoundDate(round.playedOn)}
         </h1>
         <p className="text-zinc-600 dark:text-zinc-400">
-          {myGroup ? `Du spiller i gruppe ${myGroup.number}.` : "Du er ikke med i denne runden."}
+          {myGroup ? `Du spiller i ${myGroup.label.toLowerCase()}.` : "Du er ikke med i denne runden."}
         </p>
       </div>
 
@@ -88,7 +88,7 @@ async function League() {
             }`}
           >
             <h2 className="font-semibold">
-              Gruppe {group.number}
+              {group.label}
               {group === myGroup && <span className="ml-2 text-sm font-normal text-zinc-500">(din gruppe)</span>}
             </h2>
             <ol className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800">

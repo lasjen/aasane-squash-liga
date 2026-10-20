@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 
 import { changePassword, deleteAccount, updateProfile } from "@/app/actions/settings";
 import { Field, FormMessage, FormSuccess, RadioGroup, SubmitButton } from "@/components/form";
+import { WomensLeagueCheckbox } from "@/components/womens-league-checkbox";
 import type { ProfileField } from "@/lib/auth/validation";
 import { GENDER_LABELS, GENDERS, LEVEL_HINTS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 
@@ -43,6 +44,10 @@ export function ProfileForm({ profile }: { profile: Record<ProfileField, string>
         options={genderOptions}
         defaultValue={values.gender}
         errors={errors?.gender}
+      />
+      <WomensLeagueCheckbox
+        initialGender={values.gender}
+        defaultChecked={values.wantsWomensLeague === "on"}
       />
       <Field
         label="Mobilnummer"

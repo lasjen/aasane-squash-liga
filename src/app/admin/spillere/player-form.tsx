@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { Checkbox, Field, FormMessage, RadioGroup, SubmitButton } from "@/components/form";
+import { WomensLeagueCheckbox } from "@/components/womens-league-checkbox";
 import type { AdminPlayerField } from "@/lib/admin/player-validation";
 import type { FormState } from "@/lib/auth/validation";
 import { GENDER_LABELS, GENDERS, LEVEL_LABELS, LEVELS } from "@/lib/player-options";
@@ -64,6 +65,11 @@ export function PlayerForm({
         defaultValue={values.gender ?? ""}
         errors={errors?.gender}
         required={false}
+      />
+      <WomensLeagueCheckbox
+        initialGender={values.gender}
+        defaultChecked={values.wantsWomensLeague === "on"}
+        hint="Er minst 3 kvinner påmeldt som ønsker det, spiller de i egne damegrupper og beholder plassen sin i «Alle»-rankingen."
       />
       <Field
         label="Mobilnummer"

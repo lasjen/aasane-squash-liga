@@ -8,6 +8,12 @@ const email = z
   .toLowerCase()
   .pipe(z.email({ error: "Skriv inn en gyldig e-postadresse." }));
 
+/** Avkrysningsboks: "on" når den er krysset av, ellers tom. */
+export const checkbox = z
+  .string()
+  .optional()
+  .transform((v) => v === "on");
+
 /** Feltene en spiller fyller ut om seg selv, ved registrering og under Innstillinger. */
 const profileFields = {
   firstName: z
@@ -31,7 +37,12 @@ const profileFields = {
     .refine((v) => /^\+?\d{8,15}$/.test(v), {
       error: "Skriv inn et gyldig mobilnummer, f.eks. 412 34 567.",
     }),
+  /** Bare kvinner kan spille dameliga. For andre lagres den alltid som false. */
+  wantsWomensLeague: checkbox,
 };
+
+/** Ønsket om dameliga gjelder bare kvinner. */
+export const womensLeagueFor = (gender: string | null, wants: boolean) => gender === "female" && wants;
 
 const newPassword = z
   .string()
@@ -81,6 +92,7 @@ export type RegisterField =
   | "level"
   | "email"
   | "phone"
+  | "wantsWomensLeague"
   | "password"
   | "confirmPassword";
 export type LoginField = "email" | "password";
