@@ -122,6 +122,31 @@ export const rankingInfo = pgTable(
 );
 
 /**
+ * Standardverdier for ligaen som admin setter under Innstillinger. Alltid én rad (id 1),
+ * laget første gang innstillingene lagres. Før det gjelder standardene i koden.
+ */
+export const leagueSettings = pgTable(
+  "league_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    /** Plasser i en runde. De som melder seg på etter dette, står på venteliste. */
+    maxPlayers: smallint("max_players").notNull().default(16),
+    /** Kampformatet nye runder får. */
+    bestOf: smallint("best_of").notNull().default(3),
+    /** Klokkeslettet nye runder får, i norsk tid. */
+    startsAt: time("starts_at").notNull().default("18:30"),
+    endsAt: time("ends_at").notNull().default("20:00"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("league_settings_single_row_check", sql`${t.id} = 1`),
+    check("league_settings_max_players_check", sql`${t.maxPlayers} BETWEEN 4 AND 64`),
+    check("league_settings_best_of_check", sql`${t.bestOf} IN (3, 5)`),
+    check("league_settings_time_check", sql`${t.startsAt} < ${t.endsAt}`),
+  ],
+);
+
+/**
  * Innloggingsøkter. Id-en er en SHA-256-hash av tokenet i cookien,
  * så en lekket database ikke kan brukes til å kapre økter.
  */

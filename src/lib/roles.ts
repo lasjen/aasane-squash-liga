@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_HINTS: Record<Role, string> = {
   player: "Vanlig spiller uten tilgang til konsollen.",
   operator: "Kan logge inn på /admin og drive ligaen: spillere, runder og resultater.",
-  admin: "Som operatør, og kan i tillegg endre roller og se loggen.",
+  admin: "Som operatør, og kan i tillegg endre roller, se loggen og endre innstillingene for ligaen.",
 };
 
 /** Operatører og admins har tilgang til konsollen under /admin. Admin er også operatør. */

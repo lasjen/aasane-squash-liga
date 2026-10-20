@@ -56,7 +56,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `seasons`          | Sesonger av ligaen, f.eks. «Høst 2026»                         |
 | `divisions`        | Divisjoner per sesong, nivå 1 er øverst                        |
 | `division_players` | Hvilken divisjon en spiller er i (maks én per sesong)          |
-| `rounds`           | Kampkvelder (torsdager) i en sesong, med status                |
+| `rounds`           | Kampkvelder (torsdager) i en sesong, med status, kampformat og klokkeslett |
 | `round_signups`    | Hvem som har meldt seg på en runde                             |
 | `cancelled_dates`  | Torsdager uten liga, med valgfri melding til spillerne         |
 | `round_groups`     | Gruppene i en startet runde, gruppe 1 øverst, per liga         |
@@ -66,6 +66,7 @@ PostgreSQL kjører i Docker (`docker-compose.yml`). Vi bruker
 | `matches`          | Kamper i en gruppe, med status og vinner                       |
 | `match_games`      | Poeng per game i en kamp (best av fem)                         |
 | `sessions`         | Innloggingsøkter (lagrer bare en hash av tokenet)              |
+| `league_settings`  | Standardverdier admin setter under Innstillinger (én rad)      |
 
 Tabellpoeng regnes ut fra kampene i stedet for å lagres, så tabellen
 alltid stemmer med resultatene.
@@ -137,7 +138,7 @@ Hver spiller har én rolle (`players.role`):
 | -------- | -------------------------------------------------------------------- |
 | Spiller  | Spillersidene                                                        |
 | Operatør | Konsollen under `/admin`: spillere, ligarunder, resultater, avlysninger |
-| Admin    | Alt operatøren kan, pluss å endre roller og se loggen (`/admin/logg`) |
+| Admin    | Alt operatøren kan, pluss å endre roller, se loggen (`/admin/logg`) og endre innstillingene (`/admin/innstillinger`) |
 
 - Både operatører og admins logger inn på `/admin/logg-inn` med samme e-post
   og passord som ellers. Innloggingen er en egen økt (`admin_sessions`) med
@@ -195,7 +196,10 @@ Passordbytte logger spilleren ut på alle andre enheter.
 
 Fanen «Ligarunde» på `/admin/runde` styrer runden:
 
-- **Før start:** påmeldte (maks 16), venteliste og andre aktive spillere.
+- **Klokkeslett:** runden vises som «torsdag 22. oktober (18:30 – 20:00)» på
+  forsiden, Påmelding, Liga og Ligarunde. Admin kan endre fra og til for runden
+  med en valgfri melding til spillerne, som vises under datoen.
+- **Før start:** påmeldte (maks antall fra Innstillinger), venteliste og andre aktive spillere.
   Admin kan legge til spillere og fjerne dem som ikke møter. Neste på
   ventelisten rykker da opp.
 - **Start runde** setter opp grupper og kamper. Spillerne sorteres etter
@@ -223,6 +227,21 @@ Fanen «Ligarunde» på `/admin/runde` styrer runden:
   avlysninger i en egen liste.
 - **Avslutt runde** lager resultatlisten, oppdaterer rankingen og åpner
   påmeldingen til neste runde. Knappen er sperret til alle kampene har resultat.
+
+### Innstillinger (admin)
+
+Fanen «Innstillinger» på `/admin/innstillinger` vises bare for admin. Der
+settes standardverdiene for ligaen (`league_settings`, lest med
+`getLeagueSettings` i `src/lib/league-settings.ts`):
+
+- **Maks antall deltakere** (4–64, standard 16). Gjelder med en gang, også for
+  påmeldingen som er åpen.
+- **Kampformat** (best av 3 eller 5 sett, standard 3) og **klokkeslett** (fra og
+  til, standard 18:30–20:00). Gjelder runder som lages etter at innstillingene
+  er lagret. En runde som allerede finnes, endres under Ligarunde.
+
+Før noe er lagret, gjelder standardene i koden. Forsiden og Regler viser
+tallene fra innstillingene.
 
 ### Resultatliste og ranking
 

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { MAX_PLAYERS, MIN_LEAGUE_PLAYERS, MIN_PLAYERS } from "@/lib/groups";
+import { WithLeagueSettings } from "@/components/league-settings";
+import { MIN_LEAGUE_PLAYERS, MIN_PLAYERS } from "@/lib/groups";
 import { MIN_WOMENS_LEAGUE_PLAYERS, WOMENS_LEAGUE_CHECKBOX_LABEL } from "@/lib/leagues";
 import { LEVEL_LABELS, LEVELS } from "@/lib/player-options";
-import { DEFAULT_BEST_OF, setsToWin } from "@/lib/score";
+import { setsToWin } from "@/lib/score";
 
 export const metadata: Metadata = { title: "Regler – Torsdagsligaen" };
 
@@ -43,7 +44,7 @@ export default function RulesPage() {
             liga, for eksempel i ferier, står også der.
           </li>
           <li>
-            Det er plass til {MAX_PLAYERS} spillere. De som melder seg på etter det, står på
+            Det er plass til <WithLeagueSettings>{(s) => s.maxPlayers}</WithLeagueSettings> spillere. De som melder seg på etter det, står på
             venteliste i den rekkefølgen de meldte seg på.
           </li>
           <li>
@@ -98,8 +99,11 @@ export default function RulesPage() {
 
       <Section title="Kamper">
         <p>
-          Kampene spilles best av {DEFAULT_BEST_OF} sett ({setsToWin(DEFAULT_BEST_OF)} vunne sett
-          for å vinne), med mindre admin har valgt best av 5 for runden.
+          Kampene spilles best av{" "}
+          <WithLeagueSettings>
+            {(s) => `${s.bestOf} sett (${setsToWin(s.bestOf)} vunne sett for å vinne)`}
+          </WithLeagueSettings>
+          , med mindre admin har valgt et annet format for runden.
         </p>
         <ul className={list}>
           <li>

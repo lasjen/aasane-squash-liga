@@ -1,9 +1,14 @@
 // Regler for å dele spillerne i en runde inn i grupper. Ren logikk uten database,
 // så den kan brukes både på serveren og i visningen.
 
-/** Maks antall spillere i en runde. De som melder seg på etter dette, står på venteliste. */
-export const MAX_PLAYERS = 16;
+/**
+ * Maks antall spillere i en runde før admin har endret det under Innstillinger.
+ * De som melder seg på etter dette, står på venteliste. Se getLeagueSettings.
+ */
+export const DEFAULT_MAX_PLAYERS = 16;
 export const MIN_PLAYERS = 4;
+/** Grensene admin kan sette maks antall spillere innenfor. */
+export const MAX_PLAYERS_LIMIT = 64;
 /**
  * Minste antall i en liga når runden deles i «Alle» og dameliga. Da holder en gruppe på 3.
  * Se planRoundGroups i src/lib/leagues.ts.
@@ -20,7 +25,7 @@ export const MIN_LEAGUE_PLAYERS = 3;
  * Færre enn `min` (vanligvis 4) går ikke.
  */
 export function groupSizes(count: number, min: number = MIN_PLAYERS): number[] | null {
-  if (count < min || count > MAX_PLAYERS) return null;
+  if (count < min) return null;
   if (count === 5) return [5];
   const groups = Math.ceil(count / 4);
   const small = Math.floor(count / groups);
@@ -32,7 +37,6 @@ export function groupSizes(count: number, min: number = MIN_PLAYERS): number[] |
 /** Forklaring til admin når runden ikke kan startes med dette antallet, ellers null. */
 export function groupSizeProblem(count: number): string | null {
   if (count < MIN_PLAYERS) return `Det trengs minst ${MIN_PLAYERS} spillere for å starte runden.`;
-  if (count > MAX_PLAYERS) return `Det kan være maks ${MAX_PLAYERS} spillere i en runde.`;
   if (!groupSizes(count)) {
     return `${count} spillere kan ikke deles i grupper. Legg til eller fjern en spiller.`;
   }

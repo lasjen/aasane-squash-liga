@@ -7,7 +7,7 @@ import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
 import { formatRoundDate, formatRoundDateTime } from "@/lib/dates";
-import { MAX_PLAYERS } from "@/lib/groups";
+import { getLeagueSettings } from "@/lib/league-settings";
 import { findNextRound, getSignups, getUpcomingCancellations } from "@/lib/rounds";
 
 export const metadata: Metadata = { title: "Påmelding – Torsdagsligaen" };
@@ -35,7 +35,7 @@ async function Signup({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const player = await requirePlayer();
-  const [{ date, round }, params, [me], cancellations] = await Promise.all([
+  const [{ date, round }, params, [me], cancellations, settings] = await Promise.all([
     findNextRound(),
     searchParams,
     db
@@ -43,16 +43,18 @@ async function Signup({
       .from(schema.players)
       .where(eq(schema.players.id, player.id)),
     getUpcomingCancellations(),
+    getLeagueSettings(),
   ]);
+  const { maxPlayers } = settings;
   const signups = round ? await getSignups(round.id) : [];
   const position = signups.findIndex((s) => s.playerId === player.id) + 1;
   const signedUp = position > 0;
-  const onWaitlist = position > MAX_PLAYERS;
-  const participants = signups.slice(0, MAX_PLAYERS);
+  const onWaitlist = position > maxPlayers;
+  const participants = signups.slice(0, maxPlayers);
   // Avlyste torsdager før neste runde vises som en notis, senere avlysninger som en liste.
   const skipped = cancellations.filter((c) => c.date < date);
   const later = cancellations.filter((c) => c.date > date);
-  const waitlist = signups.slice(MAX_PLAYERS);
+  const waitlist = signups.slice(maxPlayers);
   const message = typeof params.melding === "string" ? MESSAGES[params.melding] : undefined;
 
   return (
@@ -72,7 +74,7 @@ async function Signup({
             Neste runde{round ? ` · runde ${round.number}` : ""}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-            {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
+            {formatRoundDateTime(date, round?.startsAt ?? settings.startsAt, round?.endsAt ?? settings.endsAt)}
           </h1>
           {round?.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{round?.timeNote}</p>}
         </div>
@@ -85,7 +87,7 @@ async function Signup({
           <div className="flex flex-wrap items-center justify-between gap-3">
             {onWaitlist ? (
               <p className="font-medium text-amber-700 dark:text-amber-400">
-                Du står på venteliste, plass {position - MAX_PLAYERS}. Du rykker opp hvis noen melder seg av.
+                Du står på venteliste, plass {position - maxPlayers}. Du rykker opp hvis noen melder seg av.
               </p>
             ) : (
               <p className="font-medium text-emerald-700 dark:text-emerald-400">✓ Du er påmeldt</p>
@@ -105,11 +107,11 @@ async function Signup({
               pendingText="Melder på …"
               className="w-full rounded-md bg-zinc-900 px-4 py-3 font-medium text-white transition hover:bg-zinc-700 disabled:opacity-60 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
-              {participants.length >= MAX_PLAYERS ? "Sett meg på venteliste" : "Meld meg på"}
+              {participants.length >= maxPlayers ? "Sett meg på venteliste" : "Meld meg på"}
             </PendingButton>
-            {participants.length >= MAX_PLAYERS && (
+            {participants.length >= maxPlayers && (
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Runden er full med {MAX_PLAYERS} spillere.
+                Runden er full med {maxPlayers} spillere.
               </p>
             )}
           </form>
@@ -151,7 +153,7 @@ async function Signup({
         <h2 className="font-semibold">
           Påmeldte{" "}
           <span className="font-normal text-zinc-500">
-            ({participants.length}/{MAX_PLAYERS})
+            ({participants.length}/{maxPlayers})
           </span>
         </h2>
         {participants.length === 0 ? (

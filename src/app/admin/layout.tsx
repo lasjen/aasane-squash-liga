@@ -29,7 +29,7 @@ export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   );
 }
 
-/** Fanene vises bare for innloggede operatører og admins. Admin får i tillegg «Logg». */
+/** Fanene vises bare for innloggede operatører og admins. Admin får i tillegg «Logg» og «Innstillinger». */
 async function TabsForAdmin() {
   const operator = await getCurrentOperator();
   return operator ? <AdminTabs isAdmin={operator.role === "admin"} /> : null;

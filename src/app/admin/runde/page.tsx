@@ -26,10 +26,11 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
-import { DEFAULT_ENDS_AT, DEFAULT_STARTS_AT, formatRoundDate, formatRoundDateTime, formatTime, osloToday } from "@/lib/dates";
-import { MAX_PLAYERS, groupSizeProblem } from "@/lib/groups";
+import { formatRoundDate, formatRoundDateTime, formatTime, osloToday } from "@/lib/dates";
+import { groupSizeProblem } from "@/lib/groups";
+import { getLeagueSettings } from "@/lib/league-settings";
 import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
-import { BEST_OF_OPTIONS, DEFAULT_BEST_OF } from "@/lib/score";
+import { BEST_OF_OPTIONS } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
 import { findAdminRound, getGroups, getSignups, getUpcomingCancellations } from "@/lib/rounds";
 
@@ -98,7 +99,10 @@ export default function AdminRoundPage({ searchParams }: PageProps<"/admin/runde
 async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
   await requireOperator();
   const params = await searchParams;
-  const { date, round } = await findAdminRound();
+  const [{ date, round }, settings] = await Promise.all([findAdminRound(), getLeagueSettings()]);
+  // Er runden ikke opprettet ennå, får den standardene fra Innstillinger.
+  const startsAt = round?.startsAt ?? settings.startsAt;
+  const endsAt = round?.endsAt ?? settings.endsAt;
 
   const key = typeof params.melding === "string" ? params.melding : undefined;
   const message = key && MESSAGES[key]?.(params);
@@ -113,7 +117,7 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
           {started ? "i gang" : "påmelding åpen"}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-          {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
+          {formatRoundDateTime(date, startsAt, endsAt)}
         </h1>
       </div>
 
@@ -126,12 +130,12 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
         </p>
       )}
 
-      <FormatForm date={date} bestOf={round?.bestOf ?? DEFAULT_BEST_OF} roundId={round?.id ?? null} />
+      <FormatForm date={date} bestOf={round?.bestOf ?? settings.bestOf} roundId={round?.id ?? null} />
 
       <TimeForm
         date={date}
-        startsAt={round?.startsAt ?? DEFAULT_STARTS_AT}
-        endsAt={round?.endsAt ?? DEFAULT_ENDS_AT}
+        startsAt={startsAt}
+        endsAt={endsAt}
         timeNote={round?.timeNote ?? null}
       />
 
@@ -146,7 +150,7 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
       {started ? (
         <StartedRound roundId={round.id} bestOf={round.bestOf} editing={params.rediger === "1"} />
       ) : (
-        <OpenRound date={date} roundId={round?.id ?? null} />
+        <OpenRound date={date} roundId={round?.id ?? null} maxPlayers={settings.maxPlayers} />
       )}
 
       <CancelledDates />
@@ -322,10 +326,18 @@ async function activePlayersExcept(exclude: Set<number>) {
 }
 
 /** Før runden er startet: påmeldte, venteliste og andre aktive spillere. */
-async function OpenRound({ date, roundId }: { date: string; roundId: number | null }) {
+async function OpenRound({
+  date,
+  roundId,
+  maxPlayers,
+}: {
+  date: string;
+  roundId: number | null;
+  maxPlayers: number;
+}) {
   const signups = roundId ? await getSignups(roundId) : [];
-  const participants = signups.slice(0, MAX_PLAYERS);
-  const waitlist = signups.slice(MAX_PLAYERS);
+  const participants = signups.slice(0, maxPlayers);
+  const waitlist = signups.slice(maxPlayers);
   const others = await activePlayersExcept(new Set(signups.map((s) => s.playerId)));
   const { women } = splitLeagues(participants);
   const wantWomen = participants.filter(isWomensLeagueMember).length;
@@ -360,7 +372,7 @@ async function OpenRound({ date, roundId }: { date: string; roundId: number | nu
         </p>
       )}
 
-      <PlayerSection title={`Påmeldte (${participants.length}/${MAX_PLAYERS})`} empty="Ingen har meldt seg på ennå.">
+      <PlayerSection title={`Påmeldte (${participants.length}/${maxPlayers})`} empty="Ingen har meldt seg på ennå.">
         {participants.map((p, i) => (
           <PlayerRow
             key={p.playerId}
@@ -397,7 +409,7 @@ async function OpenRound({ date, roundId }: { date: string; roundId: number | nu
 
       <PlayerSection
         title={`Andre aktive spillere (${others.length})`}
-        hint={participants.length >= MAX_PLAYERS ? "Runden er full. Nye spillere havner på ventelisten." : undefined}
+        hint={participants.length >= maxPlayers ? "Runden er full. Nye spillere havner på ventelisten." : undefined}
       >
         {others.map((p) => (
           <PlayerRow key={p.id} name={`${p.firstName} ${p.lastName}`} ranking={p.ranking}>

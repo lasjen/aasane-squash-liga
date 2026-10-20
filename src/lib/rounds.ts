@@ -4,6 +4,7 @@ import { and, asc, desc, eq, gte, isNull, lte, max, or, sql } from "drizzle-orm"
 
 import { db, schema } from "@/db";
 import { addDays, osloToday, seasonFor, thursdayOnOrAfter } from "@/lib/dates";
+import { getLeagueSettings } from "@/lib/league-settings";
 import { groupLabel, type League } from "@/lib/leagues";
 
 type Db = typeof db;
@@ -116,7 +117,8 @@ async function ensureSeason(tx: Transaction, date: string) {
 }
 
 /**
- * Runden på datoen. Lages hvis den ikke finnes, med neste rundenummer i sesongen.
+ * Runden på datoen. Lages hvis den ikke finnes, med neste rundenummer i sesongen og
+ * kampformatet og klokkeslettet fra Innstillinger.
  * Tåler at to spillere melder seg på samtidig: den ene lager runden, den andre finner den.
  */
 export async function ensureRound(tx: Transaction, date: string) {
@@ -132,9 +134,10 @@ export async function ensureRound(tx: Transaction, date: string) {
     .select({ last: max(schema.rounds.number) })
     .from(schema.rounds)
     .where(eq(schema.rounds.seasonId, seasonId));
+  const { bestOf, startsAt, endsAt } = await getLeagueSettings(tx);
   const [created] = await tx
     .insert(schema.rounds)
-    .values({ seasonId, number: (last ?? 0) + 1, playedOn: date })
+    .values({ seasonId, number: (last ?? 0) + 1, playedOn: date, bestOf, startsAt, endsAt })
     .onConflictDoNothing()
     .returning({ id: schema.rounds.id, status: schema.rounds.status });
   if (created) return created;

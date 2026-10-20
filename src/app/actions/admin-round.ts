@@ -6,8 +6,8 @@ import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
-import { formatRoundDate, osloToday } from "@/lib/dates";
-import { MAX_PLAYERS } from "@/lib/groups";
+import { formatRoundDate, isTime, osloToday } from "@/lib/dates";
+import { getLeagueSettings } from "@/lib/league-settings";
 import { groupLabel, planRoundGroups } from "@/lib/leagues";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
@@ -48,13 +48,14 @@ async function groupOf(tx: Transaction, roundId: number, playerId: number) {
 }
 
 /**
- * Setter opp gruppene og kampene på nytt fra påmeldingene: de første MAX_PLAYERS påmeldte,
+ * Setter opp gruppene og kampene på nytt fra påmeldingene: de første påmeldte, så mange det er plass til,
  * sortert etter ranking. Spillere uten ranking kommer sist, i påmeldingsrekkefølge.
  * Vil minst 3 av kvinnene spille dameliga, får de egne damegrupper sortert etter
  * dameligaens ranking (se planRoundGroups).
  * Returnerer antall spillere hvis antallet ikke lar seg dele i grupper, ellers null.
  */
 async function buildGroups(tx: Transaction, roundId: number): Promise<number | null> {
+  const { maxPlayers } = await getLeagueSettings(tx);
   const participants = await tx
     .select({
       id: schema.players.id,
@@ -68,7 +69,7 @@ async function buildGroups(tx: Transaction, roundId: number): Promise<number | n
     .innerJoin(schema.players, eq(schema.players.id, schema.roundSignups.playerId))
     .where(eq(schema.roundSignups.roundId, roundId))
     .orderBy(asc(schema.roundSignups.createdAt))
-    .limit(MAX_PLAYERS);
+    .limit(maxPlayers);
 
   // Array.sort er stabil, så spillere uten ranking beholder påmeldingsrekkefølgen.
   type P = (typeof participants)[number];
@@ -243,15 +244,13 @@ export async function setRoundFormat(date: string, formData: FormData) {
   redirect(`${PAGE}?melding=${outcome}`);
 }
 
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-
 /** Setter når ligaen spilles på datoen, med en valgfri melding til spillerne. */
 export async function setRoundTime(date: string, formData: FormData) {
   const actor = await requireOperator();
   const startsAt = String(formData.get("startsAt") ?? "").slice(0, 5);
   const endsAt = String(formData.get("endsAt") ?? "").slice(0, 5);
   const timeNote = String(formData.get("timeNote") ?? "").trim().slice(0, 300) || null;
-  if (!TIME_PATTERN.test(startsAt) || !TIME_PATTERN.test(endsAt)) redirect(`${PAGE}?melding=ukjent-tid`);
+  if (!isTime(startsAt) || !isTime(endsAt)) redirect(`${PAGE}?melding=ukjent-tid`);
   if (startsAt >= endsAt) redirect(`${PAGE}?melding=tid-rekkefolge`);
 
   const outcome = await db.transaction(async (tx) => {

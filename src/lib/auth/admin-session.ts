@@ -95,7 +95,7 @@ export async function RedirectIfOperator({ to = "/admin" }: { to?: string }) {
 }
 
 /**
- * Som requireOperator, men krever admin-rollen: endre roller og se loggen.
+ * Som requireOperator, men krever admin-rollen: endre roller, se loggen og endre innstillingene.
  * Operatører uten admin-rollen sendes til forsiden av konsollen.
  */
 export async function requireAdmin() {

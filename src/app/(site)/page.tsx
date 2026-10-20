@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { getCurrentPlayer } from "@/lib/auth/session";
 import { formatRoundDate, formatRoundDateTime } from "@/lib/dates";
-import { MAX_PLAYERS } from "@/lib/groups";
+import { WithLeagueSettings } from "@/components/league-settings";
+import { getLeagueSettings } from "@/lib/league-settings";
 import { LEVEL_LABELS, LEVELS } from "@/lib/player-options";
 import {
   findNextRound,
@@ -12,21 +13,32 @@ import {
   getUpcomingCancellations,
   playerHomePath,
 } from "@/lib/rounds";
-import { DEFAULT_BEST_OF } from "@/lib/score";
 
 const primaryButton =
   "rounded-md bg-zinc-900 px-5 py-2.5 font-medium text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
 const secondaryButton =
   "rounded-md border border-zinc-300 px-5 py-2.5 font-medium transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900";
 
-const steps = [
+const steps: { title: string; text: ReactNode }[] = [
   {
     title: "Meld deg på",
-    text: `Lag en bruker og meld deg på torsdagene du kan spille. Det er plass til ${MAX_PLAYERS} spillere, og resten står på venteliste.`,
+    text: (
+      <WithLeagueSettings>
+        {(s) =>
+          `Lag en bruker og meld deg på torsdagene du kan spille. Det er plass til ${s.maxPlayers} spillere, og resten står på venteliste.`
+        }
+      </WithLeagueSettings>
+    ),
   },
   {
     title: "Spill i gruppe",
-    text: `Du spiller i en gruppe på tre eller fire med spillere nær deg på rankingen. Kampene er best av ${DEFAULT_BEST_OF} sett.`,
+    text: (
+      <WithLeagueSettings>
+        {(s) =>
+          `Du spiller i en gruppe på tre eller fire med spillere nær deg på rankingen. Kampene er best av ${s.bestOf} sett.`
+        }
+      </WithLeagueSettings>
+    ),
   },
   {
     title: "Registrer resultatet",
@@ -180,13 +192,15 @@ async function NextRound() {
     );
   }
 
-  const [{ date, round }, cancellations] = await Promise.all([
+  const [{ date, round }, cancellations, settings] = await Promise.all([
     findNextRound(),
     getUpcomingCancellations(),
+    getLeagueSettings(),
   ]);
+  const { maxPlayers } = settings;
   const signedUp = round ? (await getSignups(round.id)).length : 0;
-  const taken = Math.min(signedUp, MAX_PLAYERS);
-  const waitlist = Math.max(signedUp - MAX_PLAYERS, 0);
+  const taken = Math.min(signedUp, maxPlayers);
+  const waitlist = Math.max(signedUp - maxPlayers, 0);
   const skipped = cancellations.filter((c) => c.date < date);
 
   return (
@@ -204,12 +218,12 @@ async function NextRound() {
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium uppercase tracking-wide text-zinc-500">Neste runde</p>
           <p className="text-2xl font-semibold tracking-tight first-letter:uppercase">
-            {formatRoundDateTime(date, round?.startsAt, round?.endsAt)}
+            {formatRoundDateTime(date, round?.startsAt ?? settings.startsAt, round?.endsAt ?? settings.endsAt)}
           </p>
           {round?.timeNote && <p className="text-zinc-600 dark:text-zinc-400">{round?.timeNote}</p>}
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {taken} av {MAX_PLAYERS} plasser tatt
+          {taken} av {maxPlayers} plasser tatt
           {waitlist > 0 && ` · ${waitlist} på venteliste`}
         </p>
       </div>
@@ -218,16 +232,16 @@ async function NextRound() {
         role="progressbar"
         aria-label="Påmeldte spillere"
         aria-valuemin={0}
-        aria-valuemax={MAX_PLAYERS}
+        aria-valuemax={maxPlayers}
         aria-valuenow={taken}
       >
         <div
           className="h-full rounded-full bg-zinc-900 dark:bg-zinc-100"
-          style={{ width: `${(taken / MAX_PLAYERS) * 100}%` }}
+          style={{ width: `${(taken / maxPlayers) * 100}%` }}
         />
       </div>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {taken >= MAX_PLAYERS
+        {taken >= maxPlayers
           ? "Runden er full, men du kan fortsatt sette deg på venteliste."
           : "Påmeldingen er åpen helt til runden starter."}
       </p>

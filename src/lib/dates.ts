@@ -45,19 +45,18 @@ export function formatRoundDate(date: string): string {
   }).format(toUtcDate(date));
 }
 
-/** Når ligaen spilles hvis admin ikke har satt noe annet for runden. */
+/** Når ligaen spilles før admin har satt noe annet under Innstillinger. Se getLeagueSettings. */
 export const DEFAULT_STARTS_AT = "18:30";
 export const DEFAULT_ENDS_AT = "20:00";
+
+/** Om teksten er et klokkeslett på formen «18:30». */
+export const isTime = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
 /** Klokkeslett fra databasen («18:30:00») eller et skjema («18:30») som «18:30». */
 export const formatTime = (time: string) => time.slice(0, 5);
 
 /** F.eks. «torsdag 15. oktober (18:30 – 20:00)». */
-export function formatRoundDateTime(
-  date: string,
-  startsAt: string = DEFAULT_STARTS_AT,
-  endsAt: string = DEFAULT_ENDS_AT,
-): string {
+export function formatRoundDateTime(date: string, startsAt: string, endsAt: string): string {
   return `${formatRoundDate(date)} (${formatTime(startsAt)} – ${formatTime(endsAt)})`;
 }
 

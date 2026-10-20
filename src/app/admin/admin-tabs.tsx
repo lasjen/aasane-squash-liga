@@ -9,9 +9,15 @@ const TABS = [
   { href: "/admin/runde", label: "Ligarunde", match: (p: string) => p.startsWith("/admin/runde") },
   { href: "/admin/resultater", label: "Resultater", match: (p: string) => p.startsWith("/admin/resultater") },
   { href: "/admin/logg", label: "Logg", match: (p: string) => p.startsWith("/admin/logg"), adminOnly: true },
+  {
+    href: "/admin/innstillinger",
+    label: "Innstillinger",
+    match: (p: string) => p.startsWith("/admin/innstillinger"),
+    adminOnly: true,
+  },
 ];
 
-/** `isAdmin`: fanen «Logg» vises bare for admin. */
+/** `isAdmin`: fanene «Logg» og «Innstillinger» vises bare for admin. */
 export function AdminTabs({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
   const tabs = TABS.filter((tab) => isAdmin || !("adminOnly" in tab));
