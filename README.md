@@ -172,6 +172,10 @@ Innloggede spillere havner på `/pamelding` og melder seg på neste runde der.
   torsdag. Er den runden startet, blir neste torsdag neste runde.
 - Runden lages første gang noen melder seg på. Finnes ingen sesong som dekker
   datoen, lages «Vår ÅÅÅÅ» (januar–juni) eller «Høst ÅÅÅÅ» (juli–desember).
+- **Påmeldingsfrist** (Innstillinger, standard dagen før kl. 20:00). Når fristen
+  har gått ut, gjelder påmeldingen runden uken etter. Runden der fristen har gått
+  ut, vises over, og der kan spillerne fortsatt sette seg på venteliste eller ta
+  en ledig plass (`findSignupRounds` i `src/lib/rounds.ts`).
 - Spillere kan melde seg av helt til admin starter runden.
 - Spillere på pause kan ikke melde seg på.
 - Logikken ligger i `src/lib/rounds.ts` og `src/lib/dates.ts`.
@@ -194,12 +198,18 @@ Passordbytte logger spilleren ut på alle andre enheter.
 
 ### Ligarunden (admin)
 
-Fanen «Ligarunde» på `/admin/runde` styrer runden:
+Fanen «Ligarunde» på `/admin/runde` styrer runden. Den har to underfaner:
+«Spillere» (standard) med påmelding, venteliste, grupper og kamper, og
+«Innstillinger» (`?fane=innstillinger`) med kampformat, maks antall
+deltakere, klokkeslett, påmeldingsfrist og avlysninger for runden.
 
 - **Klokkeslett:** runden vises som «torsdag 22. oktober (18:30 – 20:00)» på
   forsiden, Påmelding, Liga og Ligarunde. Admin kan endre fra og til for runden
   med en valgfri melding til spillerne, som vises under datoen.
-- **Før start:** påmeldte (maks antall fra Innstillinger), venteliste og andre aktive spillere.
+- **Påmeldingsfristen** kan endres for runden til den er startet.
+- **Maks antall deltakere** kan endres for runden til den er startet. Øker
+  antallet, rykker de første på ventelisten opp.
+- **Før start:** påmeldte (opptil maks antall), venteliste og andre aktive spillere.
   Admin kan legge til spillere og fjerne dem som ikke møter. Neste på
   ventelisten rykker da opp.
 - **Start runde** setter opp grupper og kamper. Spillerne sorteres etter
@@ -234,11 +244,14 @@ Fanen «Innstillinger» på `/admin/innstillinger` vises bare for admin. Der
 settes standardverdiene for ligaen (`league_settings`, lest med
 `getLeagueSettings` i `src/lib/league-settings.ts`):
 
-- **Maks antall deltakere** (4–64, standard 16). Gjelder med en gang, også for
-  påmeldingen som er åpen.
-- **Kampformat** (best av 3 eller 5 sett, standard 3) og **klokkeslett** (fra og
-  til, standard 18:30–20:00). Gjelder runder som lages etter at innstillingene
-  er lagret. En runde som allerede finnes, endres under Ligarunde.
+- **Maks antall deltakere** (4–64, standard 16), **kampformat** (best av 3 eller
+  5 sett, standard 3) og **klokkeslett** (fra og til, standard 18:30–20:00).
+
+Verdiene gjelder runder som lages etter at innstillingene er lagret. En runde
+som allerede finnes, endres under Ligarunde.
+
+- **Påmeldingsfrist:** antall dager før runden (samme dag til 6 dager før) og
+  klokkeslett, standard dagen før kl. 20:00.
 
 Før noe er lagret, gjelder standardene i koden. Forsiden og Regler viser
 tallene fra innstillingene.

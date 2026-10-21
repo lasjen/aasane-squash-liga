@@ -6,8 +6,15 @@ import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
 import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
-import { formatRoundDate, isTime, osloToday } from "@/lib/dates";
-import { getLeagueSettings } from "@/lib/league-settings";
+import {
+  formatDeadline,
+  formatRoundDate,
+  isTime,
+  MAX_DEADLINE_DAYS,
+  osloToday,
+  signupDeadline,
+} from "@/lib/dates";
+import { MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
 import { groupLabel, planRoundGroups } from "@/lib/leagues";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
@@ -18,6 +25,8 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const PAGE = "/admin/runde";
 const EDIT_PAGE = "/admin/runde?rediger=1";
+/** Fanen «Innstillinger» på Ligarunde: kampformat, maks antall, klokkeslett, frist og avlysninger. */
+const SETTINGS_PAGE = "/admin/runde?fane=innstillinger";
 
 /** Låser runden for resten av transaksjonen og returnerer statusen. */
 async function lockRound(tx: Transaction, roundId: number) {
@@ -55,7 +64,10 @@ async function groupOf(tx: Transaction, roundId: number, playerId: number) {
  * Returnerer antall spillere hvis antallet ikke lar seg dele i grupper, ellers null.
  */
 async function buildGroups(tx: Transaction, roundId: number): Promise<number | null> {
-  const { maxPlayers } = await getLeagueSettings(tx);
+  const [{ maxPlayers }] = await tx
+    .select({ maxPlayers: schema.rounds.maxPlayers })
+    .from(schema.rounds)
+    .where(eq(schema.rounds.id, roundId));
   const participants = await tx
     .select({
       id: schema.players.id,
@@ -223,7 +235,7 @@ export async function recomputeRoundResults(roundId: number) {
 export async function setRoundFormat(date: string, formData: FormData) {
   const actor = await requireOperator();
   const bestOf = Number(formData.get("bestOf"));
-  if (!BEST_OF_OPTIONS.includes(bestOf as BestOf)) redirect(`${PAGE}?melding=ukjent-format`);
+  if (!BEST_OF_OPTIONS.includes(bestOf as BestOf)) redirect(`${SETTINGS_PAGE}&melding=ukjent-format`);
 
   const outcome = await db.transaction(async (tx) => {
     const round = await ensureRound(tx, date);
@@ -241,7 +253,58 @@ export async function setRoundFormat(date: string, formData: FormData) {
   if (outcome === "format") {
     await logAction(actor, "runde.format", `Satte kampformat best av ${bestOf} sett for ${formatRoundDate(date)}`);
   }
-  redirect(`${PAGE}?melding=${outcome}`);
+  redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
+}
+
+/**
+ * Setter maks antall spillere i runden før den er startet. De som er påmeldt utover
+ * antallet, står på venteliste; øker antallet, rykker de første på ventelisten opp.
+ */
+export async function setRoundMaxPlayers(date: string, formData: FormData) {
+  const actor = await requireOperator();
+  const maxPlayers = Number(formData.get("maxPlayers"));
+  if (!Number.isInteger(maxPlayers) || maxPlayers < MIN_PLAYERS || maxPlayers > MAX_PLAYERS_LIMIT) {
+    redirect(`${SETTINGS_PAGE}&melding=ukjent-antall`);
+  }
+
+  const outcome = await db.transaction(async (tx) => {
+    const round = await ensureRound(tx, date);
+    if ((await lockRound(tx, round.id)) !== "open") return "feil-status";
+    await tx.update(schema.rounds).set({ maxPlayers }).where(eq(schema.rounds.id, round.id));
+    return "maks";
+  });
+
+  if (outcome === "maks") {
+    await logAction(actor, "runde.maks", `Satte maks ${maxPlayers} spillere for ${formatRoundDate(date)}`);
+  }
+  redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
+}
+
+/** Setter påmeldingsfristen for runden: så mange dager før, kl. et klokkeslett i norsk tid. */
+export async function setRoundDeadline(date: string, formData: FormData) {
+  const actor = await requireOperator();
+  const signupDeadlineDays = Number(formData.get("signupDeadlineDays"));
+  const signupDeadlineTime = String(formData.get("signupDeadlineTime") ?? "").slice(0, 5);
+  if (!Number.isInteger(signupDeadlineDays) || signupDeadlineDays < 0 || signupDeadlineDays > MAX_DEADLINE_DAYS) {
+    redirect(`${SETTINGS_PAGE}&melding=ukjent-frist`);
+  }
+  if (!isTime(signupDeadlineTime)) redirect(`${SETTINGS_PAGE}&melding=ukjent-tid`);
+
+  const outcome = await db.transaction(async (tx) => {
+    const round = await ensureRound(tx, date);
+    if ((await lockRound(tx, round.id)) !== "open") return "feil-status";
+    await tx
+      .update(schema.rounds)
+      .set({ signupDeadlineDays, signupDeadlineTime })
+      .where(eq(schema.rounds.id, round.id));
+    return "frist";
+  });
+
+  if (outcome === "frist") {
+    const deadline = formatDeadline(signupDeadline(date, signupDeadlineDays, signupDeadlineTime));
+    await logAction(actor, "runde.frist", `Satte påmeldingsfristen for ${formatRoundDate(date)} til ${deadline}`);
+  }
+  redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
 }
 
 /** Setter når ligaen spilles på datoen, med en valgfri melding til spillerne. */
@@ -250,8 +313,8 @@ export async function setRoundTime(date: string, formData: FormData) {
   const startsAt = String(formData.get("startsAt") ?? "").slice(0, 5);
   const endsAt = String(formData.get("endsAt") ?? "").slice(0, 5);
   const timeNote = String(formData.get("timeNote") ?? "").trim().slice(0, 300) || null;
-  if (!isTime(startsAt) || !isTime(endsAt)) redirect(`${PAGE}?melding=ukjent-tid`);
-  if (startsAt >= endsAt) redirect(`${PAGE}?melding=tid-rekkefolge`);
+  if (!isTime(startsAt) || !isTime(endsAt)) redirect(`${SETTINGS_PAGE}&melding=ukjent-tid`);
+  if (startsAt >= endsAt) redirect(`${SETTINGS_PAGE}&melding=tid-rekkefolge`);
 
   const outcome = await db.transaction(async (tx) => {
     const round = await ensureRound(tx, date);
@@ -267,7 +330,7 @@ export async function setRoundTime(date: string, formData: FormData) {
       `Satte tiden ${startsAt}–${endsAt} for ${formatRoundDate(date)}${timeNote ? `: «${timeNote}»` : ""}`,
     );
   }
-  redirect(`${PAGE}?melding=${outcome}`);
+  redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
 }
 
 /** Legger en spiller til neste runde før den er startet. Er runden full, havner spilleren på venteliste. */
@@ -436,8 +499,8 @@ async function logCancel(actor: Actor, date: string, formData: FormData, outcome
 }
 
 function redirectAfterCancel(outcome: string | number): never {
-  if (typeof outcome === "string") redirect(`${PAGE}?melding=${outcome}`);
-  redirect(`${PAGE}?melding=avlyst&slettet=${outcome}`);
+  if (typeof outcome === "string") redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
+  redirect(`${SETTINGS_PAGE}&melding=avlyst&slettet=${outcome}`);
 }
 
 /** Melding til spillerne fra skjemaet, eller null hvis feltet er tomt. */
@@ -478,7 +541,7 @@ export async function updateCancelledDate(date: string, formData: FormData) {
     "avlysning.endret",
     `Endret avlysningen ${formatRoundDate(date)}${cancelHidden(formData) ? " (skjult for spillerne)" : ""}`,
   );
-  redirect(`${PAGE}?melding=avlysning-endret`);
+  redirect(`${SETTINGS_PAGE}&melding=avlysning-endret`);
 }
 
 /** Åpner en avlyst torsdag igjen. */
@@ -486,5 +549,5 @@ export async function removeCancelledDate(date: string) {
   const actor = await requireOperator();
   await db.delete(schema.cancelledDates).where(eq(schema.cancelledDates.date, date));
   await logAction(actor, "avlysning.fjernet", `Fjernet avlysningen ${formatRoundDate(date)}`);
-  redirect(`${PAGE}?melding=gjenapnet`);
+  redirect(`${SETTINGS_PAGE}&melding=gjenapnet`);
 }

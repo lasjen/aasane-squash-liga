@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, gte, isNull, lte, max, or, sql } from "drizzle-orm";
 
 import { db, schema } from "@/db";
-import { addDays, osloToday, seasonFor, thursdayOnOrAfter } from "@/lib/dates";
+import { addDays, osloNow, osloToday, seasonFor, signupDeadline, thursdayOnOrAfter } from "@/lib/dates";
 import { getLeagueSettings } from "@/lib/league-settings";
 import { groupLabel, type League } from "@/lib/leagues";
 
@@ -16,18 +16,22 @@ type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
  * `round` er null hvis ingen har meldt seg på ennå, for runden lages først ved første påmelding.
  */
 export async function findNextRound(now: Date = new Date()) {
-  const today = osloToday(now);
+  return findOpenRoundFrom(thursdayOnOrAfter(osloToday(now)));
+}
+
+/** Første torsdag fra og med `from` som har liga og ikke er startet eller avsluttet. */
+async function findOpenRoundFrom(from: string) {
   const cancelled = new Set(
     (
       await db
         .select({ date: schema.cancelledDates.date })
         .from(schema.cancelledDates)
-        .where(gte(schema.cancelledDates.date, today))
+        .where(gte(schema.cancelledDates.date, from))
     ).map((c) => c.date),
   );
 
   // To år fram er langt mer enn nok, selv med mange avlyste torsdager.
-  let date = thursdayOnOrAfter(today);
+  let date = from;
   for (let i = 0; i < 104; i++, date = addDays(date, 7)) {
     if (cancelled.has(date)) continue;
     const [round] = await db
@@ -36,9 +40,12 @@ export async function findNextRound(now: Date = new Date()) {
         number: schema.rounds.number,
         status: schema.rounds.status,
         bestOf: schema.rounds.bestOf,
+        maxPlayers: schema.rounds.maxPlayers,
         startsAt: schema.rounds.startsAt,
         endsAt: schema.rounds.endsAt,
         timeNote: schema.rounds.timeNote,
+        signupDeadlineDays: schema.rounds.signupDeadlineDays,
+        signupDeadlineTime: schema.rounds.signupDeadlineTime,
       })
       .from(schema.rounds)
       .where(eq(schema.rounds.playedOn, date))
@@ -46,6 +53,29 @@ export async function findNextRound(now: Date = new Date()) {
     if (!round || round.status === "open") return { date, round: round ?? null };
   }
   throw new Error("Fant ingen torsdag med liga de neste to årene.");
+}
+
+/**
+ * Rundene spillerne kan melde seg på. `current` er neste runde (se findNextRound). Har
+ * påmeldingsfristen for den gått ut, er `next` runden etter, og påmeldingen gjelder den.
+ * På `current` kan spillerne da fortsatt ta en ledig plass eller sette seg på venteliste.
+ */
+export async function findSignupRounds(now: Date = new Date()) {
+  const [current, settings] = await Promise.all([findNextRound(now), getLeagueSettings()]);
+  const deadline = roundDeadline(current, settings);
+  const next = osloNow(now) >= deadline.at ? await findOpenRoundFrom(addDays(current.date, 7)) : null;
+  return { current, deadline, next, settings };
+}
+
+type DeadlineFields = { signupDeadlineDays: number; signupDeadlineTime: string };
+
+/** Påmeldingsfristen for runden, eller fra Innstillinger hvis runden ikke er opprettet ennå. */
+export function roundDeadline(
+  { date, round }: { date: string; round: DeadlineFields | null },
+  settings: DeadlineFields,
+) {
+  const { signupDeadlineDays, signupDeadlineTime } = round ?? settings;
+  return signupDeadline(date, signupDeadlineDays, signupDeadlineTime);
 }
 
 /**
@@ -76,9 +106,12 @@ export async function findStartedRound() {
       number: schema.rounds.number,
       playedOn: schema.rounds.playedOn,
       bestOf: schema.rounds.bestOf,
+      maxPlayers: schema.rounds.maxPlayers,
       startsAt: schema.rounds.startsAt,
       endsAt: schema.rounds.endsAt,
       timeNote: schema.rounds.timeNote,
+      signupDeadlineDays: schema.rounds.signupDeadlineDays,
+      signupDeadlineTime: schema.rounds.signupDeadlineTime,
     })
     .from(schema.rounds)
     .where(eq(schema.rounds.status, "started"))
@@ -118,7 +151,7 @@ async function ensureSeason(tx: Transaction, date: string) {
 
 /**
  * Runden på datoen. Lages hvis den ikke finnes, med neste rundenummer i sesongen og
- * kampformatet og klokkeslettet fra Innstillinger.
+ * maks antall spillere, kampformatet, klokkeslettet og påmeldingsfristen fra Innstillinger.
  * Tåler at to spillere melder seg på samtidig: den ene lager runden, den andre finner den.
  */
 export async function ensureRound(tx: Transaction, date: string) {
@@ -134,10 +167,21 @@ export async function ensureRound(tx: Transaction, date: string) {
     .select({ last: max(schema.rounds.number) })
     .from(schema.rounds)
     .where(eq(schema.rounds.seasonId, seasonId));
-  const { bestOf, startsAt, endsAt } = await getLeagueSettings(tx);
+  const { maxPlayers, bestOf, startsAt, endsAt, signupDeadlineDays, signupDeadlineTime } =
+    await getLeagueSettings(tx);
   const [created] = await tx
     .insert(schema.rounds)
-    .values({ seasonId, number: (last ?? 0) + 1, playedOn: date, bestOf, startsAt, endsAt })
+    .values({
+      seasonId,
+      number: (last ?? 0) + 1,
+      playedOn: date,
+      maxPlayers,
+      bestOf,
+      startsAt,
+      endsAt,
+      signupDeadlineDays,
+      signupDeadlineTime,
+    })
     .onConflictDoNothing()
     .returning({ id: schema.rounds.id, status: schema.rounds.status });
   if (created) return created;

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { saveLeagueSettings } from "@/app/actions/admin-settings";
 import { PendingButton } from "@/components/pending-button";
 import { requireAdmin } from "@/lib/auth/admin-session";
+import { deadlineLabel, MAX_DEADLINE_DAYS } from "@/lib/dates";
 import { MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
 import { getLeagueSettings } from "@/lib/league-settings";
 import { BEST_OF_OPTIONS } from "@/lib/score";
@@ -17,6 +18,7 @@ const MESSAGES: Record<string, string> = {
   "ukjent-format": "Velg best av 3 eller best av 5 sett.",
   "ukjent-tid": "Skriv klokkeslettene som tt:mm.",
   "tid-rekkefolge": "Slutten må være etter starten.",
+  "ukjent-frist": `Påmeldingsfristen må være mellom 0 og ${MAX_DEADLINE_DAYS} dager før runden.`,
 };
 
 const input = "rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900";
@@ -65,10 +67,7 @@ async function Settings({ searchParams }: { searchParams: Promise<Record<string,
             defaultValue={settings.maxPlayers}
             className={`${input} w-24`}
           />
-          <span className={hint}>
-            De som melder seg på etter dette, står på venteliste. Gjelder med en gang, også for
-            påmeldingen som er åpen nå.
-          </span>
+          <span className={hint}>De som melder seg på etter dette, står på venteliste.</span>
         </label>
 
         <label className="flex flex-col gap-1">
@@ -96,9 +95,39 @@ async function Settings({ searchParams }: { searchParams: Promise<Record<string,
           </div>
         </fieldset>
 
+        <fieldset className="flex flex-col gap-1">
+          <legend className="mb-1 font-medium">Påmeldingsfrist</legend>
+          <div className="flex flex-wrap gap-2">
+            <label className="flex flex-col gap-1">
+              <span>Dager før runden</span>
+              <select name="signupDeadlineDays" defaultValue={settings.signupDeadlineDays} className={input}>
+                {Array.from({ length: MAX_DEADLINE_DAYS + 1 }, (_, days) => (
+                  <option key={days} value={days}>
+                    {deadlineLabel(days)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span>Klokkeslett</span>
+              <input
+                type="time"
+                name="signupDeadlineTime"
+                required
+                defaultValue={settings.signupDeadlineTime}
+                className={input}
+              />
+            </label>
+          </div>
+          <span className={hint}>
+            Etter fristen viser Påmelding runden uken etter. På runden der fristen har gått ut, kan
+            spillerne fortsatt sette seg på venteliste, eller ta en ledig plass hvis den ikke er full.
+          </span>
+        </fieldset>
+
         <p className={hint}>
-          Kampformat og klokkeslett gjelder runder som opprettes etter at du lagrer. En runde som
-          allerede har påmeldinger, endrer du under Ligarunde.
+          Verdiene gjelder runder som opprettes etter at du lagrer. En runde som allerede har
+          påmeldinger, endrer du under Ligarunde → Innstillinger.
         </p>
 
         <PendingButton

@@ -17,6 +17,8 @@ import {
   restartRound,
   updateCancelledDate,
   setRoundFormat,
+  setRoundDeadline,
+  setRoundMaxPlayers,
   setRoundTime,
   startRound,
 } from "@/app/actions/admin-round";
@@ -26,13 +28,22 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { PendingButton } from "@/components/pending-button";
 import { db, schema } from "@/db";
 import { requireOperator } from "@/lib/auth/admin-session";
-import { formatRoundDate, formatRoundDateTime, formatTime, osloToday } from "@/lib/dates";
-import { groupSizeProblem } from "@/lib/groups";
+import {
+  deadlineLabel,
+  formatDeadline,
+  formatRoundDate,
+  formatRoundDateTime,
+  formatTime,
+  MAX_DEADLINE_DAYS,
+  osloNow,
+  osloToday,
+} from "@/lib/dates";
+import { groupSizeProblem, MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
 import { getLeagueSettings } from "@/lib/league-settings";
 import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
 import { BEST_OF_OPTIONS } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
-import { findAdminRound, getGroups, getSignups, getUpcomingCancellations } from "@/lib/rounds";
+import { findAdminRound, getGroups, getSignups, getUpcomingCancellations, roundDeadline } from "@/lib/rounds";
 
 import { CancelRoundButton } from "./cancel-round-button";
 import { CancelledDateRow } from "./cancelled-date-row";
@@ -57,6 +68,10 @@ const MESSAGES: Record<string, (params: Params) => string> = {
   "feil-status": () => "Runden har endret status i mellomtiden. Se oppdatert status under.",
   format: () => "Kampformatet er lagret.",
   tid: () => "Klokkeslettet er lagret.",
+  maks: () => "Maks antall deltakere er lagret.",
+  frist: () => "Påmeldingsfristen er lagret.",
+  "ukjent-frist": () => `Påmeldingsfristen må være mellom 0 og ${MAX_DEADLINE_DAYS} dager før runden.`,
+  "ukjent-antall": () => `Maks antall deltakere må være mellom ${MIN_PLAYERS} og ${MAX_PLAYERS_LIMIT}.`,
   "ukjent-tid": () => "Skriv klokkeslettene som tt:mm.",
   "tid-rekkefolge": () => "Slutten må være etter starten.",
   "mangler-resultater": () => "Runden kan ikke avsluttes før alle kampene har resultat.",
@@ -103,6 +118,10 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
   // Er runden ikke opprettet ennå, får den standardene fra Innstillinger.
   const startsAt = round?.startsAt ?? settings.startsAt;
   const endsAt = round?.endsAt ?? settings.endsAt;
+  const maxPlayers = round?.maxPlayers ?? settings.maxPlayers;
+
+  const deadline = roundDeadline({ date, round }, settings);
+  const tab: Tab = params.fane === "innstillinger" ? "innstillinger" : "spillere";
 
   const key = typeof params.melding === "string" ? params.melding : undefined;
   const message = key && MESSAGES[key]?.(params);
@@ -119,7 +138,15 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
         <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
           {formatRoundDateTime(date, startsAt, endsAt)}
         </h1>
+        {!started && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Påmeldingsfrist {formatDeadline(deadline)}
+            {osloNow() >= deadline.at && " (gått ut)"}
+          </p>
+        )}
       </div>
+
+      <RoundTabs tab={tab} />
 
       {message && (
         <p
@@ -130,31 +157,99 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
         </p>
       )}
 
-      <FormatForm date={date} bestOf={round?.bestOf ?? settings.bestOf} roundId={round?.id ?? null} />
+      {tab === "innstillinger" ? (
+        <>
+          <FormatForm date={date} bestOf={round?.bestOf ?? settings.bestOf} roundId={round?.id ?? null} />
 
-      <TimeForm
-        date={date}
-        startsAt={startsAt}
-        endsAt={endsAt}
-        timeNote={round?.timeNote ?? null}
-      />
+          {!started && <MaxPlayersForm date={date} maxPlayers={maxPlayers} />}
 
-      {!started && (
-        <CancelRoundButton
-          action={cancelNextRound.bind(null, date)}
-          dateLabel={formatRoundDate(date)}
-          signupCount={signupCount}
-        />
-      )}
+          <TimeForm date={date} startsAt={startsAt} endsAt={endsAt} timeNote={round?.timeNote ?? null} />
 
-      {started ? (
+          {!started && (
+            <DeadlineForm
+              date={date}
+              days={round?.signupDeadlineDays ?? settings.signupDeadlineDays}
+              time={round?.signupDeadlineTime ?? settings.signupDeadlineTime}
+            />
+          )}
+
+          {!started && (
+            <CancelRoundButton
+              action={cancelNextRound.bind(null, date)}
+              dateLabel={formatRoundDate(date)}
+              signupCount={signupCount}
+            />
+          )}
+
+          <CancelledDates />
+        </>
+      ) : started ? (
         <StartedRound roundId={round.id} bestOf={round.bestOf} editing={params.rediger === "1"} />
       ) : (
-        <OpenRound date={date} roundId={round?.id ?? null} maxPlayers={settings.maxPlayers} />
+        <OpenRound date={date} roundId={round?.id ?? null} maxPlayers={maxPlayers} />
       )}
-
-      <CancelledDates />
     </>
+  );
+}
+
+type Tab = "spillere" | "innstillinger";
+
+/**
+ * Underfanene på Ligarunde: «Spillere» (påmelding, grupper og kamper) er valgt som standard,
+ * «Innstillinger» har kampformat, maks antall, klokkeslett, påmeldingsfrist og avlysninger.
+ */
+function RoundTabs({ tab }: { tab: Tab }) {
+  const tabs: { key: Tab; label: string; href: string }[] = [
+    { key: "spillere", label: "Spillere", href: "/admin/runde" },
+    { key: "innstillinger", label: "Innstillinger", href: "/admin/runde?fane=innstillinger" },
+  ];
+  return (
+    <nav
+      aria-label="Ligarunde"
+      className="inline-flex self-start rounded-lg border border-zinc-200 bg-zinc-50 p-1 dark:border-zinc-800 dark:bg-zinc-900"
+    >
+      {tabs.map((t) => (
+        <Link
+          key={t.key}
+          href={t.href}
+          aria-current={t.key === tab ? "page" : undefined}
+          scroll={false}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+            t.key === tab
+              ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-950 dark:text-zinc-100"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          }`}
+        >
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** Påmeldingsfristen for runden. Kan endres til runden er startet. */
+function DeadlineForm({ date, days, time }: { date: string; days: number; time: string }) {
+  const input = "rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900";
+  return (
+    <form action={setRoundDeadline.bind(null, date)} className="flex flex-wrap items-end gap-2 text-sm">
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Påmeldingsfrist</span>
+        <select name="signupDeadlineDays" defaultValue={days} className={input}>
+          {Array.from({ length: MAX_DEADLINE_DAYS + 1 }, (_, d) => (
+            <option key={d} value={d}>
+              {deadlineLabel(d)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="font-medium">Kl.</span>
+        <input type="time" name="signupDeadlineTime" required defaultValue={formatTime(time)} className={input} />
+      </label>
+      <PendingButton pendingText="Lagrer …" className={smallButton}>
+        Lagre frist
+      </PendingButton>
+    </form>
   );
 }
 
@@ -258,6 +353,30 @@ async function FormatForm({
           </option>
         ))}
       </select>
+      <PendingButton pendingText="Lagrer …" className={smallButton}>
+        Lagre
+      </PendingButton>
+    </form>
+  );
+}
+
+/** Maks antall deltakere i runden. Kan endres til runden er startet. */
+function MaxPlayersForm({ date, maxPlayers }: { date: string; maxPlayers: number }) {
+  return (
+    <form action={setRoundMaxPlayers.bind(null, date)} className="flex flex-wrap items-center gap-2 text-sm">
+      <label htmlFor="maks-deltakere" className="font-medium">
+        Maks antall deltakere
+      </label>
+      <input
+        id="maks-deltakere"
+        type="number"
+        name="maxPlayers"
+        required
+        min={MIN_PLAYERS}
+        max={MAX_PLAYERS_LIMIT}
+        defaultValue={maxPlayers}
+        className="w-20 rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
+      />
       <PendingButton pendingText="Lagrer …" className={smallButton}>
         Lagre
       </PendingButton>

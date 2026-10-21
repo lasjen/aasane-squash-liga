@@ -11,6 +11,18 @@ export function osloToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: TIME_ZONE }).format(now);
 }
 
+/** Nå i norsk tid som «YYYY-MM-DD HH:MM», så det kan sammenlignes med en frist. */
+export function osloNow(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(now);
+}
+
 const toUtcDate = (date: string) => new Date(`${date}T00:00:00Z`);
 const fromUtcDate = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -59,6 +71,30 @@ export const formatTime = (time: string) => time.slice(0, 5);
 export function formatRoundDateTime(date: string, startsAt: string, endsAt: string): string {
   return `${formatRoundDate(date)} (${formatTime(startsAt)} – ${formatTime(endsAt)})`;
 }
+
+/** Påmeldingsfristen før admin har satt noe annet under Innstillinger: dagen før kl. 20:00. */
+export const DEFAULT_SIGNUP_DEADLINE_DAYS = 1;
+export const DEFAULT_SIGNUP_DEADLINE_TIME = "20:00";
+
+/** Fristen kan være opptil en uke før runden, så den aldri havner før forrige runde. */
+export const MAX_DEADLINE_DAYS = 6;
+
+/** «samme dag», «dagen før», «2 dager før» … */
+export const deadlineLabel = (days: number) =>
+  days === 0 ? "samme dag" : days === 1 ? "dagen før" : `${days} dager før`;
+
+/**
+ * Påmeldingsfristen for runden på datoen: `days` dager før, kl. `time` i norsk tid.
+ * `at` er på samme form som osloNow, så `osloNow() >= at` betyr at fristen har gått ut.
+ */
+export function signupDeadline(date: string, days: number, time: string) {
+  const day = addDays(date, -days);
+  return { day, time: formatTime(time), at: `${day} ${formatTime(time)}` };
+}
+
+/** F.eks. «onsdag 21. oktober kl. 20:00». */
+export const formatDeadline = (deadline: { day: string; time: string }) =>
+  `${formatRoundDate(deadline.day)} kl. ${deadline.time}`;
 
 /** F.eks. «15. oktober 2026 kl. 19:30», i norsk tid. */
 export function formatDateTime(date: Date): string {

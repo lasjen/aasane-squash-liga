@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { WithLeagueSettings } from "@/components/league-settings";
+import { deadlineLabel } from "@/lib/dates";
 import { MIN_LEAGUE_PLAYERS, MIN_PLAYERS } from "@/lib/groups";
 import { MIN_WOMENS_LEAGUE_PLAYERS, WOMENS_LEAGUE_CHECKBOX_LABEL } from "@/lib/leagues";
 import { LEVEL_LABELS, LEVELS } from "@/lib/player-options";
@@ -46,6 +47,14 @@ export default function RulesPage() {
           <li>
             Det er plass til <WithLeagueSettings>{(s) => s.maxPlayers}</WithLeagueSettings> spillere. De som melder seg på etter det, står på
             venteliste i den rekkefølgen de meldte seg på.
+          </li>
+          <li>
+            Påmeldingsfristen er vanligvis{" "}
+            <WithLeagueSettings>
+              {(s) => `${deadlineLabel(s.signupDeadlineDays)} kl. ${s.signupDeadlineTime}`}
+            </WithLeagueSettings>
+            , og den står ved hver runde under «Påmelding». Etter fristen gjelder påmeldingen uken etter. Du kan fortsatt sette deg på venteliste
+            til runden der fristen har gått ut, eller ta en ledig plass hvis den ikke er full.
           </li>
           <li>
             Du kan melde deg av helt til runden starter. Da rykker neste på ventelisten opp.

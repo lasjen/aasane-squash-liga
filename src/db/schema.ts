@@ -129,13 +129,16 @@ export const leagueSettings = pgTable(
   "league_settings",
   {
     id: integer("id").primaryKey().default(1),
-    /** Plasser i en runde. De som melder seg på etter dette, står på venteliste. */
+    /** Plassene nye runder får. */
     maxPlayers: smallint("max_players").notNull().default(16),
     /** Kampformatet nye runder får. */
     bestOf: smallint("best_of").notNull().default(3),
     /** Klokkeslettet nye runder får, i norsk tid. */
     startsAt: time("starts_at").notNull().default("18:30"),
     endsAt: time("ends_at").notNull().default("20:00"),
+    /** Påmeldingsfristen nye runder får: så mange dager før, kl. signupDeadlineTime. */
+    signupDeadlineDays: smallint("signup_deadline_days").notNull().default(1),
+    signupDeadlineTime: time("signup_deadline_time").notNull().default("20:00"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -143,6 +146,7 @@ export const leagueSettings = pgTable(
     check("league_settings_max_players_check", sql`${t.maxPlayers} BETWEEN 4 AND 64`),
     check("league_settings_best_of_check", sql`${t.bestOf} IN (3, 5)`),
     check("league_settings_time_check", sql`${t.startsAt} < ${t.endsAt}`),
+    check("league_settings_deadline_days_check", sql`${t.signupDeadlineDays} BETWEEN 0 AND 6`),
   ],
 );
 
@@ -275,11 +279,16 @@ export const rounds = pgTable(
     status: roundStatus("status").notNull().default("open"),
     /** Kampformat: best av 3 eller best av 5 sett. */
     bestOf: smallint("best_of").notNull().default(3),
+    /** Plasser i runden. De som melder seg på etter dette, står på venteliste. */
+    maxPlayers: smallint("max_players").notNull().default(16),
     /** Når ligaen spilles denne torsdagen, i norsk tid. */
     startsAt: time("starts_at").notNull().default("18:30"),
     endsAt: time("ends_at").notNull().default("20:00"),
     /** Valgfri melding til spillerne om tidspunktet, f.eks. hvorfor det er endret. */
     timeNote: text("time_note"),
+    /** Påmeldingsfristen: så mange dager før runden, kl. signupDeadlineTime i norsk tid. */
+    signupDeadlineDays: smallint("signup_deadline_days").notNull().default(1),
+    signupDeadlineTime: time("signup_deadline_time").notNull().default("20:00"),
     ...timestamps,
   },
   (t) => [
@@ -287,6 +296,8 @@ export const rounds = pgTable(
     unique("rounds_season_date_unique").on(t.seasonId, t.playedOn),
     check("rounds_best_of_check", sql`${t.bestOf} IN (3, 5)`),
     check("rounds_time_check", sql`${t.startsAt} < ${t.endsAt}`),
+    check("rounds_max_players_check", sql`${t.maxPlayers} BETWEEN 4 AND 64`),
+    check("rounds_deadline_days_check", sql`${t.signupDeadlineDays} BETWEEN 0 AND 6`),
   ],
 );
 

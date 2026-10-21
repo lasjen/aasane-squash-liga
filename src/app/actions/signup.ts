@@ -6,16 +6,18 @@ import { redirect } from "next/navigation";
 
 import { db, schema } from "@/db";
 import { requirePlayer } from "@/lib/auth/session";
-import { ensureRound, findNextRound } from "@/lib/rounds";
+import { ensureRound, findSignupRounds } from "@/lib/rounds";
 
 /**
- * Sjekker at runden spilleren så på siden fortsatt er neste runde og er åpen.
- * Datoen sendes med fra skjemaet, så ingen blir meldt på en annen runde enn de trodde.
+ * Sjekker at runden spilleren så på siden fortsatt er åpen for påmelding: neste runde, eller
+ * runden etter når fristen for neste runde har gått ut. Datoen sendes med fra skjemaet,
+ * så ingen blir meldt på en annen runde enn de trodde.
  */
 async function assertOpenRound(date: string) {
-  const next = await findNextRound();
-  if (next.date !== date) redirect("/pamelding?melding=runden-er-startet");
-  return next;
+  const { current, next } = await findSignupRounds();
+  const round = [current, next].find((r) => r?.date === date);
+  if (!round) redirect("/pamelding?melding=runden-er-startet");
+  return round;
 }
 
 export async function signUp(date: string) {

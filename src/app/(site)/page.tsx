@@ -197,7 +197,7 @@ async function NextRound() {
     getUpcomingCancellations(),
     getLeagueSettings(),
   ]);
-  const { maxPlayers } = settings;
+  const maxPlayers = round?.maxPlayers ?? settings.maxPlayers;
   const signedUp = round ? (await getSignups(round.id)).length : 0;
   const taken = Math.min(signedUp, maxPlayers);
   const waitlist = Math.max(signedUp - maxPlayers, 0);
