@@ -5,17 +5,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import {
-  addCancelledDate,
   addToGroup,
   addToRound,
   cancelNextRound,
   finishRound,
   movePlayer,
-  removeCancelledDate,
   removeFromRound,
   resetRound,
   restartRound,
-  updateCancelledDate,
   setRoundFormat,
   setRoundDeadline,
   setRoundMaxPlayers,
@@ -36,17 +33,15 @@ import {
   formatTime,
   MAX_DEADLINE_DAYS,
   osloNow,
-  osloToday,
 } from "@/lib/dates";
 import { groupSizeProblem, MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
 import { getLeagueSettings } from "@/lib/league-settings";
 import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
 import { BEST_OF_OPTIONS } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
-import { findAdminRound, getGroups, getSignups, getUpcomingCancellations, roundDeadline } from "@/lib/rounds";
+import { findAdminRound, getGroups, getSignups, roundDeadline } from "@/lib/rounds";
 
 import { CancelRoundButton } from "./cancel-round-button";
-import { CancelledDateRow } from "./cancelled-date-row";
 
 export const metadata: Metadata = { title: "Ligarunde – Admin – Torsdagsligaen" };
 
@@ -84,8 +79,6 @@ const MESSAGES: Record<string, (params: Params) => string> = {
   "ikke-torsdag": () => "Velg en gyldig torsdag.",
   "dato-passert": () => "Datoen har allerede vært.",
   "runde-startet": () => "Runden den dagen er allerede startet, og kan ikke avlyses.",
-  gjenapnet: () => "Avlysningen er fjernet, og datoen er åpen for liga igjen.",
-  "avlysning-endret": () => "Avlysningen er endret.",
   "format-laast": () => "Kampformatet kan ikke endres etter at det er registrert resultater.",
   "ukjent-format": () => "Velg best av 3 eller best av 5 sett.",
   antall: (params) =>
@@ -180,8 +173,6 @@ async function AdminRound({ searchParams }: { searchParams: Promise<Params> }) {
               signupCount={signupCount}
             />
           )}
-
-          <CancelledDates />
         </>
       ) : started ? (
         <StartedRound roundId={round.id} bestOf={round.bestOf} editing={params.rediger === "1"} />
@@ -196,7 +187,7 @@ type Tab = "spillere" | "innstillinger";
 
 /**
  * Underfanene på Ligarunde: «Spillere» (påmelding, grupper og kamper) er valgt som standard,
- * «Innstillinger» har kampformat, maks antall, klokkeslett, påmeldingsfrist og avlysninger.
+ * «Innstillinger» har kampformat, maks antall, klokkeslett, påmeldingsfrist og avlysning av runden.
  */
 function RoundTabs({ tab }: { tab: Tab }) {
   const tabs: { key: Tab; label: string; href: string }[] = [
@@ -250,62 +241,6 @@ function DeadlineForm({ date, days, time }: { date: string; days: number; time: 
         Lagre frist
       </PendingButton>
     </form>
-  );
-}
-
-/** Kommende torsdager uten liga, med mulighet for å legge til og fjerne datoer. */
-async function CancelledDates() {
-  const cancellations = await getUpcomingCancellations({ includeHidden: true });
-
-  return (
-    <section className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-      <h2 className="font-semibold">Torsdager uten liga</h2>
-      {cancellations.length === 0 ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Ingen kommende torsdager er avlyst.</p>
-      ) : (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-          {cancellations.map((c) => (
-            <CancelledDateRow
-              key={c.date}
-              dateLabel={formatRoundDate(c.date)}
-              reason={c.reason}
-              hidden={c.hidden}
-              updateAction={updateCancelledDate.bind(null, c.date)}
-              removeAction={removeCancelledDate.bind(null, c.date)}
-            />
-          ))}
-        </ul>
-      )}
-      <form action={addCancelledDate} className="flex flex-wrap items-end gap-2 text-sm">
-        <label className="flex flex-col gap-1">
-          <span className="font-medium">Dato (torsdag)</span>
-          <input
-            type="date"
-            name="date"
-            required
-            min={osloToday()}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <label className="flex min-w-48 flex-1 flex-col gap-1">
-          <span className="font-medium">Melding til spillerne (valgfritt)</span>
-          <input
-            type="text"
-            name="reason"
-            maxLength={300}
-            placeholder="F.eks. Høstferie"
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900"
-          />
-        </label>
-        <label className="flex items-center gap-2 self-center">
-          <input type="checkbox" name="hidden" className="size-4 accent-zinc-900 dark:accent-zinc-100" />
-          Ikke vis for spillerne
-        </label>
-        <PendingButton pendingText="Legger til …" className={secondaryButton}>
-          Legg til
-        </PendingButton>
-      </form>
-    </section>
   );
 }
 

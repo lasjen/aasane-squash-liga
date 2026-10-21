@@ -4,7 +4,7 @@ import { and, asc, count, eq, isNotNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { db, schema } from "@/db";
-import { requireOperator } from "@/lib/auth/admin-session";
+import { requireAdmin, requireOperator } from "@/lib/auth/admin-session";
 import { logAction, playerLabel, roundLabel, type Actor } from "@/lib/audit";
 import {
   formatDeadline,
@@ -27,6 +27,8 @@ const PAGE = "/admin/runde";
 const EDIT_PAGE = "/admin/runde?rediger=1";
 /** Fanen «Innstillinger» på Ligarunde: kampformat, maks antall, klokkeslett, frist og avlysninger. */
 const SETTINGS_PAGE = "/admin/runde?fane=innstillinger";
+/** Admin → Innstillinger, der «Torsdager uten liga» ligger. Bare for admin. */
+const ADMIN_SETTINGS_PAGE = "/admin/innstillinger";
 
 /** Låser runden for resten av transaksjonen og returnerer statusen. */
 async function lockRound(tx: Transaction, roundId: number) {
@@ -498,9 +500,11 @@ async function logCancel(actor: Actor, date: string, formData: FormData, outcome
   );
 }
 
-function redirectAfterCancel(outcome: string | number): never {
-  if (typeof outcome === "string") redirect(`${SETTINGS_PAGE}&melding=${outcome}`);
-  redirect(`${SETTINGS_PAGE}&melding=avlyst&slettet=${outcome}`);
+/** Tilbake til Ligarunde → Innstillinger, eller til `page` (f.eks. Admin → Innstillinger). */
+function redirectAfterCancel(outcome: string | number, page: string = SETTINGS_PAGE): never {
+  const sep = page.includes("?") ? "&" : "?";
+  if (typeof outcome === "string") redirect(`${page}${sep}melding=${outcome}`);
+  redirect(`${page}${sep}melding=avlyst&slettet=${outcome}`);
 }
 
 /** Melding til spillerne fra skjemaet, eller null hvis feltet er tomt. */
@@ -522,16 +526,16 @@ export async function cancelNextRound(date: string, formData: FormData) {
 
 /** Legger inn en torsdag uten liga fra skjemaet (dato og valgfri melding). Finnes datoen, oppdateres meldingen. */
 export async function addCancelledDate(formData: FormData) {
-  const actor = await requireOperator();
+  const actor = await requireAdmin();
   const date = String(formData.get("date") ?? "");
   const outcome = await cancelThursday(date, cancelMessage(formData), cancelHidden(formData));
   await logCancel(actor, date, formData, outcome);
-  redirectAfterCancel(outcome);
+  redirectAfterCancel(outcome, ADMIN_SETTINGS_PAGE);
 }
 
 /** Endrer meldingen og om avlysningen vises for spillerne. */
 export async function updateCancelledDate(date: string, formData: FormData) {
-  const actor = await requireOperator();
+  const actor = await requireAdmin();
   await db
     .update(schema.cancelledDates)
     .set({ reason: cancelMessage(formData), hidden: cancelHidden(formData) })
@@ -541,13 +545,13 @@ export async function updateCancelledDate(date: string, formData: FormData) {
     "avlysning.endret",
     `Endret avlysningen ${formatRoundDate(date)}${cancelHidden(formData) ? " (skjult for spillerne)" : ""}`,
   );
-  redirect(`${SETTINGS_PAGE}&melding=avlysning-endret`);
+  redirect(`${ADMIN_SETTINGS_PAGE}?melding=avlysning-endret`);
 }
 
 /** Åpner en avlyst torsdag igjen. */
 export async function removeCancelledDate(date: string) {
-  const actor = await requireOperator();
+  const actor = await requireAdmin();
   await db.delete(schema.cancelledDates).where(eq(schema.cancelledDates.date, date));
   await logAction(actor, "avlysning.fjernet", `Fjernet avlysningen ${formatRoundDate(date)}`);
-  redirect(`${SETTINGS_PAGE}&melding=gjenapnet`);
+  redirect(`${ADMIN_SETTINGS_PAGE}?melding=gjenapnet`);
 }

@@ -201,7 +201,7 @@ Passordbytte logger spilleren ut på alle andre enheter.
 Fanen «Ligarunde» på `/admin/runde` styrer runden. Den har to underfaner:
 «Spillere» (standard) med påmelding, venteliste, grupper og kamper, og
 «Innstillinger» (`?fane=innstillinger`) med kampformat, maks antall
-deltakere, klokkeslett, påmeldingsfrist og avlysninger for runden.
+deltakere, klokkeslett, påmeldingsfrist og «Avlys denne torsdagen».
 
 - **Klokkeslett:** runden vises som «torsdag 22. oktober (18:30 – 20:00)» på
   forsiden, Påmelding, Liga og Ligarunde. Admin kan endre fra og til for runden
@@ -229,7 +229,8 @@ deltakere, klokkeslett, påmeldingsfrist og avlysninger for runden.
   beholdes, også endringer gjort under Edit. Går ikke for en torsdag som har vært.
 - **Avlys denne torsdagen** (før start) sletter runden og påmeldingene, og
   påmeldingen går videre til neste torsdag med liga. Admin kan skrive en
-  melding til spillerne. Under «Torsdager uten liga» kan admin legge inn
+  melding til spillerne. Under «Torsdager uten liga» (nederst på Admin →
+  Innstillinger, bare for admin) kan admin legge inn
   framtidige datoer uten liga, endre meldingen og fjerne avlysninger. En
   avlysning kan skjules for spillerne («Ikke vis for spillerne»); datoen
   hoppes likevel over. På påmeldingssiden vises
