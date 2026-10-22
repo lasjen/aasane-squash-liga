@@ -70,3 +70,19 @@ export function planRoundGroups<T extends WomensLeagueCandidate>(
   const womenGroups = splitIntoGroups([...women].sort(compareWomen), MIN_LEAGUE_PLAYERS);
   return openGroups && womenGroups ? { open: openGroups, women: womenGroups } : null;
 }
+
+type RankedCandidate = WomensLeagueCandidate & { ranking: number | null; womenRanking: number | null };
+
+/**
+ * Trekningen av gruppene når runden startes: planRoundGroups med «Alle» sortert etter ranking
+ * og damegruppene etter dameligaens ranking. `players` er deltakerne i påmeldingsrekkefølge;
+ * Array.sort er stabil, så spillere uten ranking kommer sist og beholder den rekkefølgen.
+ */
+export function planRoundByRanking<T extends RankedCandidate>(players: T[]) {
+  const byRanking = (a: T, b: T) => (a.ranking ?? Infinity) - (b.ranking ?? Infinity);
+  return planRoundGroups(
+    players,
+    byRanking,
+    (a, b) => (a.womenRanking ?? Infinity) - (b.womenRanking ?? Infinity) || byRanking(a, b),
+  );
+}

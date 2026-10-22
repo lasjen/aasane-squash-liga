@@ -15,7 +15,7 @@ import {
   signupDeadline,
 } from "@/lib/dates";
 import { MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
-import { groupLabel, planRoundGroups } from "@/lib/leagues";
+import { groupLabel, planRoundByRanking } from "@/lib/leagues";
 import { regenerateGroupMatches } from "@/lib/round-matches";
 import { countMissingResults, finishedRoundEditProblem, saveRoundResults } from "@/lib/round-results";
 import { ensureRound } from "@/lib/rounds";
@@ -62,7 +62,7 @@ async function groupOf(tx: Transaction, roundId: number, playerId: number) {
  * Setter opp gruppene og kampene på nytt fra påmeldingene: de første påmeldte, så mange det er plass til,
  * sortert etter ranking. Spillere uten ranking kommer sist, i påmeldingsrekkefølge.
  * Vil minst 3 av kvinnene spille dameliga, får de egne damegrupper sortert etter
- * dameligaens ranking (se planRoundGroups).
+ * dameligaens ranking (se planRoundByRanking).
  * Returnerer antall spillere hvis antallet ikke lar seg dele i grupper, ellers null.
  */
 async function buildGroups(tx: Transaction, roundId: number): Promise<number | null> {
@@ -85,14 +85,7 @@ async function buildGroups(tx: Transaction, roundId: number): Promise<number | n
     .orderBy(asc(schema.roundSignups.createdAt))
     .limit(maxPlayers);
 
-  // Array.sort er stabil, så spillere uten ranking beholder påmeldingsrekkefølgen.
-  type P = (typeof participants)[number];
-  const byRanking = (a: P, b: P) => (a.ranking ?? Infinity) - (b.ranking ?? Infinity);
-  const plan = planRoundGroups(
-    participants,
-    byRanking,
-    (a, b) => (a.womenRanking ?? Infinity) - (b.womenRanking ?? Infinity) || byRanking(a, b),
-  );
+  const plan = planRoundByRanking(participants);
   if (!plan) return participants.length;
 
   const groups = [

@@ -36,7 +36,14 @@ import {
 } from "@/lib/dates";
 import { groupSizeProblem, MAX_PLAYERS_LIMIT, MIN_PLAYERS } from "@/lib/groups";
 import { getLeagueSettings } from "@/lib/league-settings";
-import { isWomensLeagueMember, LEAGUES, MIN_WOMENS_LEAGUE_PLAYERS, splitLeagues } from "@/lib/leagues";
+import {
+  groupLabel,
+  isWomensLeagueMember,
+  LEAGUES,
+  MIN_WOMENS_LEAGUE_PLAYERS,
+  planRoundByRanking,
+  splitLeagues,
+} from "@/lib/leagues";
 import { BEST_OF_OPTIONS } from "@/lib/score";
 import { getRoundMatches } from "@/lib/round-matches";
 import { findAdminRound, getGroups, getSignups, roundDeadline } from "@/lib/rounds";
@@ -426,6 +433,8 @@ async function OpenRound({
         </p>
       )}
 
+      <DrawPreview participants={participants} />
+
       <PlayerSection title={`Påmeldte (${participants.length}/${maxPlayers})`} empty="Ingen har meldt seg på ennå.">
         {participants.map((p, i) => (
           <PlayerRow
@@ -476,6 +485,70 @@ async function OpenRound({
         ))}
       </PlayerSection>
     </>
+  );
+}
+
+type Signup = Awaited<ReturnType<typeof getSignups>>[number];
+
+/**
+ * Slik blir gruppene hvis runden startes nå: samme trekning som «Start runde» (planRoundByRanking),
+ * med deltakerne slik påmeldingen og rankingen er akkurat nå.
+ */
+function DrawPreview({ participants }: { participants: Signup[] }) {
+  if (participants.length === 0) return null;
+  const plan = planRoundByRanking(participants);
+  const hasWomen = !!plan && plan.women.length > 0;
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="font-semibold">Trekning med nåværende påmelding</h2>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Slik blir gruppene hvis runden startes nå. Endres påmeldingen eller rankingen før start, endres også gruppene.
+        </p>
+      </div>
+      {!plan ? (
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          {groupSizeProblem(participants.length) ?? "Antallet spillere går ikke opp i grupper."}
+        </p>
+      ) : (
+        LEAGUES.filter((league) => plan[league].length > 0).map((league) => (
+          <div key={league} className="flex flex-col gap-2">
+            {hasWomen && (
+              <h3 className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                {league === "women" ? "Dameliga" : "Alle"}
+              </h3>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {plan[league].map((players, i) => (
+                <section
+                  key={i}
+                  className="flex flex-col gap-1 rounded-lg border border-dashed border-zinc-300 p-3 dark:border-zinc-700"
+                >
+                  <h4 className="flex items-baseline justify-between text-sm font-semibold">
+                    {groupLabel(league, i + 1)}
+                    <span className="font-normal text-zinc-500">{players.length} spillere</span>
+                  </h4>
+                  <ul className="flex flex-col text-sm">
+                    {players.map((p) => {
+                      const ranking = league === "women" ? p.womenRanking : p.ranking;
+                      return (
+                        <li key={p.playerId} className="flex gap-2 py-0.5">
+                          <span className="w-7 text-right tabular-nums text-zinc-500">{ranking ?? "–"}</span>
+                          <span className="flex-1">
+                            {p.firstName} {p.lastName}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </section>
   );
 }
 
