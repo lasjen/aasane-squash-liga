@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { LeagueSwitch, leagueFromParams } from "@/components/league-switch";
 import { db, schema } from "@/db";
-import { requirePlayer } from "@/lib/auth/session";
+import { getCurrentPlayer } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/dates";
 import { isWomensLeagueMember, MIN_WOMENS_LEAGUE_PLAYERS, type League } from "@/lib/leagues";
 import { LEVEL_LABELS } from "@/lib/player-options";
@@ -26,7 +26,8 @@ export default function RankingPage({ searchParams }: PageProps<"/ranking">) {
 }
 
 async function Ranking({ searchParams }: { searchParams: Promise<Params> }) {
-  const me = await requirePlayer();
+  // Åpen for alle; innloggede spillere får sin egen plass uthevet.
+  const me = await getCurrentPlayer();
   const league = leagueFromParams(await searchParams);
   const info = await getRankingInfo();
   const players = await db
@@ -73,7 +74,7 @@ async function Ranking({ searchParams }: { searchParams: Promise<Params> }) {
           <>
             <UpdatedAt league={league} at={info.updatedAt.women} />
             <RankingList
-              meId={me.id}
+              meId={me?.id}
               rows={women.map((p) => ({ ...p, place: p.womenRanking! }))}
             />
           </>
@@ -104,7 +105,7 @@ async function Ranking({ searchParams }: { searchParams: Promise<Params> }) {
 
       <UpdatedAt league={league} at={info.updatedAt.open} />
       <RankingList
-        meId={me.id}
+        meId={me?.id}
         rows={ranked.map((p) => ({ ...p, place: p.ranking!, tag: isWomensLeagueMember(p) ? "dameliga" : undefined }))}
       />
 
@@ -116,9 +117,9 @@ async function Ranking({ searchParams }: { searchParams: Promise<Params> }) {
           </p>
           <ul className="text-zinc-700 dark:text-zinc-300">
             {unranked.map((p) => (
-              <li key={p.id} className={p.id === me.id ? "font-medium" : undefined}>
+              <li key={p.id} className={p.id === me?.id ? "font-medium" : undefined}>
                 {p.firstName} {p.lastName}
-                {p.id === me.id && <span className="ml-2 text-sm font-normal text-zinc-500">(deg)</span>}
+                {p.id === me?.id && <span className="ml-2 text-sm font-normal text-zinc-500">(deg)</span>}
               </li>
             ))}
           </ul>
@@ -147,7 +148,7 @@ type Row = {
   tag?: string;
 };
 
-function RankingList({ rows, meId }: { rows: Row[]; meId: number }) {
+function RankingList({ rows, meId }: { rows: Row[]; meId?: number }) {
   return (
     <ol className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
       {rows.map((p) => {

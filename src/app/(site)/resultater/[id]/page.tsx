@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { RoundResults } from "@/components/round-results";
-import { requirePlayer } from "@/lib/auth/session";
+import { getCurrentPlayer } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Resultater – Torsdagsligaen" };
 
@@ -22,8 +22,9 @@ export default function RoundResultPage({ params }: PageProps<"/resultater/[id]"
 }
 
 async function Results({ params }: { params: Promise<{ id: string }> }) {
-  const me = await requirePlayer();
+  // Åpen for alle; innloggede spillere får sin egen rad uthevet.
+  const me = await getCurrentPlayer();
   const id = Number((await params).id);
   if (!Number.isSafeInteger(id) || id < 1) notFound();
-  return (await RoundResults({ roundId: id, highlight: me.id })) ?? notFound();
+  return (await RoundResults({ roundId: id, highlight: me?.id })) ?? notFound();
 }

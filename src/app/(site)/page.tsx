@@ -168,6 +168,12 @@ async function CallToAction() {
       <Link href="/logg-inn" className={secondaryButton}>
         Logg inn
       </Link>
+      <Link href="/resultater" className="self-center px-2 font-medium underline">
+        Se resultater
+      </Link>
+      <Link href="/ranking" className="self-center px-2 font-medium underline">
+        Se ranking
+      </Link>
     </div>
   );
 }

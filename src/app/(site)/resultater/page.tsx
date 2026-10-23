@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { FinishedRoundList } from "@/components/round-results";
-import { requirePlayer } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Resultater – Torsdagsligaen" };
 
@@ -17,7 +16,7 @@ export default function ResultsPage() {
   );
 }
 
+/** Resultatene er åpne for alle, også uten innlogging. */
 async function Rounds() {
-  await requirePlayer();
   return <FinishedRoundList basePath="/resultater" />;
 }
